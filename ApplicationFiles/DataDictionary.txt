@@ -1,0 +1,31 @@
+Data Dictionary: A Bayesian spatio-temporal abundance model for surveillance of the opioid epidemic
+
+File: ApplicationData.csv (contains data on all 88 counties from 2007 - 2019)
+
+Variables
+County - name of the Ohio county the row of data corresponds to
+Year - year which the row of data corresponds to
+Population - estimates of the yearly county-level population size from the National Center for Health Statistics obtained from the Ohio Public Health Data Warehouse
+Deaths - number of deaths where the death certificate listed the cause of death as poisoning from any opioid, publicly available from theOhio Public Health Data Warehouse
+Treatment - Simulated county-level count of treatment admissions (Actual values cannot be shared per the DUA). 
+HPSA - Indicator that a county is classified as a Health Professional Shortage Area by the Bureau of Health Workforce in the U.S. Department of Health and Human Services
+MU - Indicator that a county is classified as Medically Underserved by the Bureau of Health Workforce in the U.S. Department of Health and Human Services
+Interstate - Indicator that at least one major interstate intersects with that county
+HIDTA - Indicator that a county is classified as a High Intensity Drug Trafficking Area by the U.S. Drug Enforcement Administration
+MSA - Indicator that a county is classified as a Metropolitan Statistical Area by the U.S. Census Bureau
+Prescribing_Rate - Opioid prescribing rate per capita from the Ohio Automated RX Reporting System (available beginning in 2010)
+
+Files: OH_ACS_1yrEst.csv, OH_ACS_1yrMOE.csv, OH_ACS_5yrEst.csv, OH_ACS_5yrMOE.csv 
+
+These files contain the estimates and margin of errors for the data from the American Community Survey 
+The 5-year data files have the 5-year estimates and margin of errors for each county from 2009 to 2018
+The 1-year data files have the 1-year estimates and margin of errors for the 38 counties that had 1-year estimates from 2009 to 2018
+
+Poverty - Percentage of families and people whose income in the past 12 months is below the poverty level
+Unemployed - Percentage of the civilian labor force that is unemployed
+HS_ED - Percentage of the population 25 years and older that is a high school graduate
+Food_Stamps - Percentage of households receiving food stamps/SNAP benefits in the last 12 months
+
+File: OhioAdjacency.csv
+
+This file is the adjacency matrix specifying the neighborhood structure used for the spatial model
