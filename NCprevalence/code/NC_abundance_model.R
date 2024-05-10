@@ -1,10 +1,9 @@
-# LOAD R PACKAGES
+## LOAD R PACKAGES
 library(tidyverse) # data manipulation and visualization
 library(nimble) # Bayesian inference for multi-level models
 
-# IMPORT PRE-PROCESSED DATA USED TO FIT MODEL. 
-setwd("C:/Users/bnwhite/OneDrive - Wake Forest Baptist Health/projects/Kline/NC_abundance_model/code")
-load("../data/data_for_analysis.Rda") # data_for_analysis.Rda file generated via NC_abundance_data.R file.
+# IMPORT PRE-PROCESSED DATA USED TO FIT MODEL (data_for_analysis.Rda is generated from the NC_abundance_data.R file)
+load("../data/data_for_analysis.Rda")
 
 # DEFINE NIMBLE MODEL
 model_code <- nimbleCode({
@@ -37,7 +36,8 @@ model_code <- nimbleCode({
     
     # mean state-wide average risk of misuse in year t
     # mu[t] <- beta.mu[1] + beta.mu[2]*t
-      mu[t] <- ilogit(beta.mu[1] + beta.mu[2]*t)
+    mu[t] <- ilogit(beta.mu[1] + beta.mu[2]*t)
+
     
   }
   
@@ -59,8 +59,7 @@ model_code <- nimbleCode({
       pi[(t-1)*R+i,3] <- ilogit(beta[t,3] + inprod(X.B[(t-1)*R+i, 1:bp], beta.B[1:bp]) + (f[(t-1)*R+i,3] + mu.f[(t-1)*R+i,3]) + eps[(t-1)*R+i,3])
       
       # latent counts (process model)
-      # mu.u[(t-1)*R+i] <- inprod(W.cent[(t+3)*R+i,1:gp],gamma[1:gp]) + phi.u*(u[(t-2)*R+i] - inprod(W.cent[(t+2)*R+i,1:gp],gamma[1:gp])) # t+3==2016 for W.cent when t=1
-      mu.u[(t-1)*R+i] <- inprod(W.cent[(t+3)*R+i,1:gp],gamma[1:gp]) + phi.u*u[(t-2)*R+i]
+      mu.u[(t-1)*R+i] <- inprod(W.cent[(t+3)*R+i,1:gp],gamma[1:gp]) + phi.u*u[(t-2)*R+i] # t+3==2016 for W.cent when t=1
       lambda[(t-1)*R+i] <- exp((u[(t-1)*R+i] + mu.u[(t-1)*R+i]) + v[(t-1)*R+i])
       N[(t-1)*R+i] ~ dbinom(mu[t]*lambda[(t-1)*R+i], P[(t-1)*R+i])
       v[(t-1)*R+i] ~ dnorm(0, tau.v)
@@ -68,7 +67,7 @@ model_code <- nimbleCode({
     }
     
     # mean state-wide risk of misuse in year t
-    #mu[t] <- beta.mu[1] + beta.mu[2]*t
+    # mu[t] <- beta.mu[1] + beta.mu[2]*t
     mu[t] <- ilogit(beta.mu[1] + beta.mu[2]*t)
     
   }
@@ -160,7 +159,7 @@ model_code <- nimbleCode({
   for(l in 1:L){
     
     #S[l] ~ T(dnorm(beta.mu[1]+beta.mu[2]*ell.rate[l], sd=S.se[l]), 0, 1)
-    S[l] ~ dnorm(beta.mu[1]+beta.mu[2]*ell.rate[l], sd=S.se[l])
+     S[l] ~ dnorm(beta.mu[1]+beta.mu[2]*ell.rate[l], sd=S.se[l])
     
   }
   
@@ -290,7 +289,7 @@ mod_data <- list(y=as.matrix(yfit[,1:3]),
 
 # specify initial values
 beta.mu.init <- lm(S~ell.rate)$coefficients
-logit_beta.mu.init <- lm(logit_S~ell.rate)$coefficients # use for beta.mu init 
+logit_beta.mu.init <- lm(logit_S~ell.rate)$coefficients
 beta.init <- matrix(data = 0, nrow = T, ncol = K)
 Ninit <- floor(yfit$pop*beta.mu.init[1])
 finit <- matrix(data = 0, nrow = n*T, ncol = K)
@@ -438,6 +437,6 @@ samples <- runMCMC(compiled_mcmc,
 
 Sys.time()-st
 
-MCMCtrace(samples, params = "beta.mu", pdf = F)
+save(samples, file = "../output/full/NC_abundance_output_full_logit_S_2024_02_12.Rda")
 
-#save(samples, file = "../output/full/NC_abundance_output_logit_S.Rda")
+q()
