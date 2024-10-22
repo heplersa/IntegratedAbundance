@@ -1,4 +1,4 @@
-## LOAD R PACKAGES
+# LOAD R PACKAGES
 library(tidyverse) # data manipulation and visualization
 library(nimble) # Bayesian inference for multi-level models
 
@@ -12,13 +12,21 @@ model_code <- nimbleCode({
     
     for(i in 1:R){ # counties
       
-      for(j in 1:K){ # outcome(s) with unique cases, model as binomial
+      for(j in c(1, K)){ 
         
+        # uncensored outcome(s)
         y[(t-1)*R+i,j] ~ dbinom(pi[(t-1)*R+i,j], N[(t-1)*R+i])
         mu.f[(t-1)*R+i,j] <- 0
-        eps[(t-1)*R+i,j] ~ dnorm(0,tau[j])
         
       }
+      
+        # censored outcome (treatment program use outcome censors non-zero counts less than 5)
+        censored[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,2], c[(t-1)*R+i, 1:2])
+        y[(t-1)*R+i,2] ~ dbinom(pi[(t-1)*R+i,2], N[(t-1)*R+i])
+        mu.f[(t-1)*R+i,2] <- 0
+
+      # outcome error term
+      eps[(t-1)*R+i, 1:3] ~ dmnorm(mean = mean.eps[1:3], cov = cov.eps[1:3, 1:3])
       
       # logistic link for binomial outcome(s)
       pi[(t-1)*R+i,1] <- ilogit(beta[t,1] + inprod(X.D[(t-1)*R+i, 1:dp], beta.D[1:dp]) + (f[(t-1)*R+i,1] + mu.f[(t-1)*R+i,1]) + eps[(t-1)*R+i,1])
@@ -35,9 +43,7 @@ model_code <- nimbleCode({
     }
     
     # mean state-wide average risk of misuse in year t
-    # mu[t] <- beta.mu[1] + beta.mu[2]*t
     mu[t] <- ilogit(beta.mu[1] + beta.mu[2]*t)
-
     
   }
   
@@ -45,13 +51,21 @@ model_code <- nimbleCode({
     
     for(i in 1:R){ # counties
       
-      for(j in 1:K){ # outcome(s) with unique cases, model as binomial
+      for(j in c(1, K)){ 
         
+        # uncensored outcome(s)
         y[(t-1)*R+i,j] ~ dbinom(pi[(t-1)*R+i,j], N[(t-1)*R+i])
         mu.f[(t-1)*R+i,j] <- phi.f[j]*f[(t-2)*R+i, j]
-        eps[(t-1)*R+i,j] ~ dnorm(0, tau[j])
         
       }
+
+        # censored outcome (treatment program use outcome censors non-zero counts less than 5)
+        censored[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,2], c[(t-1)*R+i, 1:2])
+        y[(t-1)*R+i,2] ~ dbinom(pi[(t-1)*R+i,2], N[(t-1)*R+i])
+        mu.f[(t-1)*R+i,2] <- phi.f[2]*f[(t-2)*R+i, 2]
+      
+      # outcome error term
+      eps[(t-1)*R+i, 1:3] ~ dmnorm(mean = mean.eps[1:3], cov = cov.eps[1:3, 1:3])
       
       # logistic link for binomial outcome(s)
       pi[(t-1)*R+i,1] <- ilogit(beta[t,1] + inprod(X.D[(t-1)*R+i, 1:dp], beta.D[1:dp]) + (f[(t-1)*R+i,1] + mu.f[(t-1)*R+i,1]) + eps[(t-1)*R+i,1])
@@ -67,7 +81,6 @@ model_code <- nimbleCode({
     }
     
     # mean state-wide risk of misuse in year t
-    # mu[t] <- beta.mu[1] + beta.mu[2]*t
     mu[t] <- ilogit(beta.mu[1] + beta.mu[2]*t)
     
   }
@@ -118,7 +131,7 @@ model_code <- nimbleCode({
   for(t in 1:n1){
     
     for(j in 1:gp){
-
+      
       W1.state[t,j] ~ dnorm(mu.W[ony_ind_state[t],j], sd=W1.state.se[t,j])
       
     }
@@ -144,7 +157,7 @@ model_code <- nimbleCode({
                                                   num=num[],
                                                   tau=tau.g[j],
                                                   zero_mean=1)
-
+      
       
     }
     
@@ -158,8 +171,7 @@ model_code <- nimbleCode({
   # state-wide survey data model
   for(l in 1:L){
     
-    #S[l] ~ T(dnorm(beta.mu[1]+beta.mu[2]*ell.rate[l], sd=S.se[l]), 0, 1)
-     S[l] ~ dnorm(beta.mu[1]+beta.mu[2]*ell.rate[l], sd=S.se[l])
+    S[l] ~ dnorm(beta.mu[1]+beta.mu[2]*ell.rate[l], sd=S.se[l])
     
   }
   
@@ -230,11 +242,9 @@ model_code <- nimbleCode({
     
   }
   
-  #linear coefficients for state-level survey data
-  #beta.mu[1] ~ dflat()
-  #beta.mu[2] ~ dflat()
-  
   beta.mu[1:2] ~ dmnorm(mean = mean.mu[1:2], cov = cov.mu[1:2, 1:2])
+  
+  cov.eps[1:3, 1:3] ~ dwish(R=cov.eps.R[1:3, 1:3], df=3)
   
   tau.u ~ dgamma(.5,.5) # variance parameter for for spatial random effect in process level
   phi.u ~ dunif(0,1) # auto-regressive parameter for spatial random effect in process level
@@ -250,8 +260,16 @@ n1 <- nrow(logit_W1.state) # number of counties/years with data in W1.state
 T <- length(2016:2021) # number of years
 K <-  dim(yfit[, 1:3])[2] # number of outcomes
 
-mean.mu <- c(0, 0)
-cov.mu <- 10^4*diag(2)
+# prepare constraint objects
+cens_index <- which(is.na(yfit$`People served by treatment programs`))
+censored <- rep(1, 600)
+yinit <- yfit[,1:3]
+yinit[cens_index, 2] <-  2
+c <- matrix(0, nrow=600, ncol=2)
+c[cens_index, 1] <- 0
+c[cens_index, 2] <- 4
+c[-cens_index, 1] <- -Inf
+c[-cens_index, 2] <- Inf
 
 mod_constants <- list(R = n,
                       T = T,
@@ -268,16 +286,20 @@ mod_constants <- list(R = n,
                       num = num,
                       adj = adj, 
                       S.se = logit_S.se,
-                      mean.mu = mean.mu,
-                      cov.mu = cov.mu,
+                      mean.mu = rep(0, 2),
+                      cov.mu = 10^4*diag(2),
+                      mean.eps = rep(0, 3),
+                      cov.eps.R = diag(3),
                       W5se = logit_W5.se,
                       W1se = logit_W1.se,
                       W1.state.se = logit_W1.state.se,
                       ony_ind = ony_ind,
-                      ony_ind_state = ony_ind_state
+                      ony_ind_state = ony_ind_state,
+                      c = c
 )
 
 mod_data <- list(y=as.matrix(yfit[,1:3]),
+                 censored=censored,
                  S=logit_S,
                  X.D=X.D,
                  X.T=X.T,
@@ -289,7 +311,7 @@ mod_data <- list(y=as.matrix(yfit[,1:3]),
 
 # specify initial values
 beta.mu.init <- lm(S~ell.rate)$coefficients
-logit_beta.mu.init <- lm(logit_S~ell.rate)$coefficients
+logit_beta.mu.init <- lm(logit_S~ell.rate)$coefficients # use for beta.mu init 
 beta.init <- matrix(data = 0, nrow = T, ncol = K)
 Ninit <- floor(yfit$pop*beta.mu.init[1])
 finit <- matrix(data = 0, nrow = n*T, ncol = K)
@@ -330,11 +352,13 @@ if(length(II) > 0){
 }
 
 # set initial values.
-mod_inits <- list(N = Ninit,
+mod_inits <- list(y = as.matrix(yinit),
+                  N = Ninit,
                   beta = beta.init,
                   beta.D = rep(0,ncol(X.D)),
                   beta.T = rep(0,ncol(X.T)),
                   beta.B = rep(0,ncol(X.B)),
+                  cov.eps = diag(3),
                   gamma = rep(0, ncol(logit_W1.obs)),
                   tau.v = .1, 
                   u = uinit,
@@ -365,6 +389,8 @@ mcmc_conf <- configureMCMC(nimble_model,
                                       'tau.g',
                                       'tau.W',
                                       'tau.W0',
+                                      'eps',
+                                      'cov.eps',
                                       'v',
                                       'beta',
                                       'beta.D',
@@ -437,6 +463,6 @@ samples <- runMCMC(compiled_mcmc,
 
 Sys.time()-st
 
-save(samples, file = "../output/full/NC_abundance_output_full_logit_S_2024_02_12.Rda")
+save(samples, file = "../output/full/NC_abundance_output_full_revision.Rda")
 
 q()
