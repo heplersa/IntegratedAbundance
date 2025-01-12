@@ -3,5 +3,5 @@
 .RData
 .Ruserdata
 WAprevalence/data/outcomes
-WAprevalence/data_for_analysis.Rda
+WAprevalence/data/data_for_analysis.Rda
 WAprevalence/output
