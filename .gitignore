@@ -2,6 +2,5 @@
 .Rhistory
 .RData
 .Ruserdata
-Single_year_crc_file.csv
-MCMC_no_covariates.Rda
+WAprevalence/data/outcomes
 WAprevalence/output
