@@ -1,3 +1,7 @@
+# FIT INTEGRATED ABUNDANCE MODEL USING PROCESSED WA DATA #
+# BRIAN N. WHITE #
+# 2025-01-10 #
+
 # LOAD R PACKAGES
 library(tidyverse) # data manipulation and visualization
 library(nimble) # Bayesian inference for multi-level models
