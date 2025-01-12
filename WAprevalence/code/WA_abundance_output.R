@@ -1,6 +1,6 @@
 # EXAMINE WA ABUNDANCE MODEL MCMC CONVERGENCE & GENERATE FIGURES/TABLES #
 # BRIAN N. WHITE #
-# 2024-10-22 #
+# 2025-01-11 #
 
 # LOAD R PACKAGES
 library(tidyverse) # data manipulation and visualization
