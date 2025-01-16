@@ -298,7 +298,7 @@ tibble(pred_beta = results[[1]][beta_lwr:beta_upr],
   labs(color = "Outcome",
        fill = "Outcome",
        x = "Year",
-       y = "Estimated intercept (log-odds)")
+       y = "Estimated prevalence (log-odds)")
 
 ggsave(filename = "beta_log_odds.png",
        path = "WAprevalence/output",
