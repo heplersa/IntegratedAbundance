@@ -1,6 +1,6 @@
 # PRE-PROCESS WASHINGTON STATE DATA FOR USE IN INTEGRATED ABUNDANCE MODEL #
 # BRIAN N. WHITE #
-# 2025-01-10 #
+# 2025-01-17 #
 
 # IMPORT R PACKAGES
 library(tidyverse) # data manipulation and visualization
@@ -78,18 +78,22 @@ library(tidycensus) # pull pop data from US Census
   # import raw data
   outcomes_raw <- read.csv("WAprevalence/data/outcomes/Single_year_crc_file.csv")
   # process raw data
-  outcomes_processed <- outcomes_raw %>%
-                          group_by(year, county) %>%
-                          summarise(pmp = sum(pmp),
-                                    death = sum(death),
-                                    OUD = sum(OUD)) %>%
-                          mutate(county = str_to_lower(county)) %>%
-                          filter(county != "unknown") %>%
-                          left_join(WA_county_pop_processed,
-                                    by = c("county", "year"))
   
-  # check that there is no missing data
-  apply(outcomes_processed, 2, function(x) sum(is.na(x)))
+    # extract pmp and death marginal counts from encoded 2x2 tables in raw data
+    outcomes_processed <- outcomes_raw %>%
+                            filter(county != "UNKNOWN") %>%
+                            group_by(year, county, pmp, death) %>%
+                            summarise(oud_sum = sum(OUD)) %>%
+                            pivot_wider(names_from = c(pmp, death),
+                                        values_from = oud_sum) %>%
+                            rowwise() %>%
+                            mutate(pmp = sum(`1_0`,`1_1`, na.rm = T),
+                                   death = sum(`0_1` + `1_1`, na.rm =T)
+                            ) %>%
+                            mutate(county = tolower(county))
+  
+  # check that there is no missing data in marginal outcomes
+  apply(outcomes_processed[, c("pmp", "death")], 2, function(x) sum(is.na(x))) == c(0, 0)
   # check that all counties-years are present; 6 years x 39 counties = 234 rows
   nrow(outcomes_processed) == 6*39
   
