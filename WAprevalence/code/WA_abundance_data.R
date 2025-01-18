@@ -86,6 +86,7 @@ library(tidycensus) # pull pop data from US Census
                             summarise(oud_sum = sum(OUD)) %>%
                             pivot_wider(names_from = c(pmp, death),
                                         values_from = oud_sum) %>%
+                            mutate(across(c(`1_0`, `0_1`, `1_1`), function(x) if_else(is.na(x)==T, 0, x))) %>%
                             rowwise() %>%
                             mutate(pmp = sum(`1_0`,`1_1`, na.rm = T),
                                    death = sum(`0_1` + `1_1`, na.rm =T)
