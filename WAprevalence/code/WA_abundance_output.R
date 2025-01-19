@@ -236,7 +236,6 @@ ggsave(filename = "death_obs_rate.png",
        height = 3,
        width = 10) 
 
-
 ggsave(filename = "pmp.png", 
        plot = pmp_map, 
        path = "WAprevalence/output/maps", 
