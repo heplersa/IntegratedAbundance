@@ -348,9 +348,9 @@ tibble(pred_mu_aggr = pred_mu_aggr,
        lwr95_aggr = lwr95_aggr,
        upr95_aggr = upr95_aggr,
        year = 2017:2021
-       ) %>%
+) %>%
   ggplot() +
-  geom_point(aes(x = year, y = S),
+  geom_point(aes(x = year, y = S, color = "NSDUH Data"),
              data = tibble(year = c(2016:2018, 2021),
                            S = S[1:4])) +
   geom_errorbar(aes(x = year, y = S, ymin = S - 1.96*S.se, ymax = S + 1.96*S.se),
@@ -358,13 +358,14 @@ tibble(pred_mu_aggr = pred_mu_aggr,
                 data = tibble(year = c(2016:2018, 2021),
                               S = S[1:4],
                               S.se = S.se[1:4])) +
-  geom_line(aes(x = year, y = pred_mu_aggr), color = "blue") +
+  geom_line(aes(x = year, y = pred_mu_aggr, color = "Model")) +
   geom_ribbon(aes(x = year, y = pred_mu_aggr, ymin = lwr95_aggr, ymax = upr95_aggr),
               color = "light blue",
               fill = "light blue",
               alpha = 0.5) +
   labs(x = "Year",
        y = "Statewide Prevalence of PWMO") +
+  scale_color_manual(name = "", values = c("NSDUH Data" = "black", "Model" = "blue")) +
   theme_classic()
 
 ggsave("2_yr_mu_trend.png",
