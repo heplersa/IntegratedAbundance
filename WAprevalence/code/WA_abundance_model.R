@@ -1,6 +1,6 @@
 # FIT INTEGRATED ABUNDANCE MODEL USING PROCESSED WA DATA #
 # BRIAN N. WHITE #
-# 2025-01-10 #
+# 2025-01-18 #
 
 # LOAD R PACKAGES
 library(tidyverse) # data manipulation and visualization
@@ -24,12 +24,11 @@ model_code <- nimbleCode({
       }
       
       # outcome error term
-      eps[(t-1)*R+i, 1:3] ~ dmnorm(mean = mean.eps[1:3], cov = cov.eps[1:3, 1:3])
+      eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], cov = cov.eps[1:K, 1:K])
       
       # logistic link for binomial outcome(s)
       pi[(t-1)*R+i,1] <- ilogit(beta[t,1] + (f[(t-1)*R+i,1] + mu.f[(t-1)*R+i,1]) + eps[(t-1)*R+i,1])
       pi[(t-1)*R+i,2] <- ilogit(beta[t,2] + (f[(t-1)*R+i,2] + mu.f[(t-1)*R+i,2]) + eps[(t-1)*R+i,2])
-      pi[(t-1)*R+i,3] <- ilogit(beta[t,3] + (f[(t-1)*R+i,3] + mu.f[(t-1)*R+i,3]) + eps[(t-1)*R+i,3])
       
       # latent counts (process model)
       mu.u[(t-1)*R+i] <- 0
@@ -57,13 +56,12 @@ model_code <- nimbleCode({
       }
       
       # outcome error term
-      eps[(t-1)*R+i, 1:3] ~ dmnorm(mean = mean.eps[1:3], cov = cov.eps[1:3, 1:3])
+      eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], cov = cov.eps[1:K, 1:K])
       
       # logistic link for binomial outcome(s)
       pi[(t-1)*R+i,1] <- ilogit(beta[t,1] + (f[(t-1)*R+i,1] + mu.f[(t-1)*R+i,1]) + eps[(t-1)*R+i,1])
       pi[(t-1)*R+i,2] <- ilogit(beta[t,2] + (f[(t-1)*R+i,2] + mu.f[(t-1)*R+i,2]) + eps[(t-1)*R+i,2])
-      pi[(t-1)*R+i,3] <- ilogit(beta[t,3] + (f[(t-1)*R+i,3] + mu.f[(t-1)*R+i,3]) + eps[(t-1)*R+i,3])
-      
+
       # latent counts (process model)
       mu.u[(t-1)*R+i] <- phi.u*u[(t-2)*R+i] 
       lambda[(t-1)*R+i] <- exp((u[(t-1)*R+i] + mu.u[(t-1)*R+i]) + v[(t-1)*R+i])
@@ -125,7 +123,7 @@ model_code <- nimbleCode({
   
   beta.mu[1:2] ~ dmnorm(mean = mean.mu[1:2], cov = cov.mu[1:2, 1:2])
   
-  cov.eps[1:3, 1:3] ~ dwish(R=cov.eps.R[1:3, 1:3], df=3)
+  cov.eps[1:K, 1:K] ~ dwish(R=cov.eps.R[1:K, 1:K], df=K)
   
   tau.u ~ dgamma(.5,.5) # variance parameter for for spatial random effect in process level
   phi.u ~ dunif(0,1) # auto-regressive parameter for spatial random effect in process level
@@ -136,7 +134,7 @@ model_code <- nimbleCode({
 # DEFINE NIMBLE CONSTANTS, DATA, and INITS
 n <- length(num) # number of WA counties
 T <- length(2017:2022) # number of years
-K <-  dim(yfit[, 3:5])[2] # number of outcomes
+K <-  dim(yfit[, 6:7])[2] # number of outcomes
 
 mod_constants <- list(R = n,
                       T = T,
@@ -149,11 +147,11 @@ mod_constants <- list(R = n,
                       S.se = logit_S.se,
                       mean.mu = rep(0, 2),
                       cov.mu = 10^4*diag(2),
-                      mean.eps = rep(0, 3),
-                      cov.eps.R = diag(3)
+                      mean.eps = rep(0, K),
+                      cov.eps.R = diag(K)
 )
 
-mod_data <- list(y=as.matrix(yfit[,3:5]),
+mod_data <- list(y=as.matrix(yfit[,6:7]),
                  S=logit_S
 )
 
@@ -169,38 +167,30 @@ II <- which(Ninit > yfit$pop)
 
 if(length(II) > 0){
   
-  Ninit[II] <- floor(.1*yfit[II, 6])
+  Ninit[II] <- floor(.1*yfit[II, 8])
   
 }
 
-II <- which(Ninit < yfit[,3])
+II <- which(Ninit < yfit[,6])
 
 if(length(II) > 0){
   
-  Ninit[II] <- yfit[II,1] + 100
+  Ninit[II] <- yfit[II,6] + 100
   
 }
 
-II <- which(Ninit < yfit[,4])
+II <- which(Ninit < yfit[,7])
 
 if(length(II) > 0){
   
-  Ninit[II] <- yfit[II,2] + 100
-  
-}
-
-II <- which(Ninit < yfit[,5])
-
-if(length(II) > 0){
-  
-  Ninit[II] <- yfit[II,3] + 100
+  Ninit[II] <- yfit[II,7] + 100
   
 }
 
 # set initial values.
 mod_inits <- list(N = Ninit,
                   beta = beta.init,
-                  cov.eps = diag(3),
+                  cov.eps = diag(K),
                   tau.v = .1, 
                   u = uinit,
                   f = finit,
@@ -290,6 +280,6 @@ samples <- runMCMC(compiled_mcmc,
 
 Sys.time()-st
 
-MCMCvis::MCMCtrace(samples, pdf = F, params = "cov.eps")
+MCMCvis::MCMCtrace(samples, pdf = F, params = "pi")
 
 save(samples, file = "WAprevalence/output/MCMC_no_covariates.Rda")

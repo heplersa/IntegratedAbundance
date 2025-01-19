@@ -79,7 +79,7 @@ library(tidycensus) # pull pop data from US Census
   outcomes_raw <- read.csv("WAprevalence/data/outcomes/Single_year_crc_file.csv")
   # process raw data
   
-    # extract pmp and death marginal counts from encoded 2x2 tables in raw data
+    # extract pmp and death marginal counts from encoded 2x2 tables in raw data; combine with population data
     outcomes_processed <- outcomes_raw %>%
                             filter(county != "UNKNOWN") %>%
                             group_by(year, county, pmp, death) %>%
@@ -91,7 +91,9 @@ library(tidycensus) # pull pop data from US Census
                             mutate(pmp = sum(`1_0`,`1_1`, na.rm = T),
                                    death = sum(`0_1` + `1_1`, na.rm =T)
                             ) %>%
-                            mutate(county = tolower(county))
+                            mutate(county = tolower(county)) %>%
+                            left_join(WA_county_pop_processed,
+                                      by = c("year", "county"))
   
   # check that there is no missing data in marginal outcomes
   apply(outcomes_processed[, c("pmp", "death")], 2, function(x) sum(is.na(x))) == c(0, 0)
