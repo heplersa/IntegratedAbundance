@@ -1,6 +1,6 @@
 # EXAMINE WA ABUNDANCE MODEL MCMC CONVERGENCE & GENERATE FIGURES/TABLES #
 # BRIAN N. WHITE #
-# 2025-01-11 #
+# 2025-01-19 #
 
 # LOAD R PACKAGES
 library(tidyverse) # data manipulation and visualization
@@ -25,12 +25,10 @@ load("WAprevalence/data/shape_county_WA.Rda")
 # EXAMINE MCMC CONVERGENCE
 MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:234, 20), ", 1]"), ISB = F, filename = "pmp", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:234, 20), ", 2]"), ISB = F, filename = "death", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:234, 20), ", 3]"), ISB = F, filename = "oud", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("N[", sample(1:234, 20), "]"), ISB = F, filename = "N", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("lambda[", sample(1:234, 20), "]"), ISB = F, filename = "lambda", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:234, 20), ", 1]"), ISB = F, filename = "f_pmp", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:234, 20), ", 2]"), ISB = F, filename = "f_death", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:234, 20), ", 3]"), ISB = F, filename = "f_oud", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("v[", sample(1:234, 20), "]"), ISB = F, filename = "v", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("u[", sample(1:234, 20), "]"), ISB = F, filename = "u", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = "beta", filename = "beta", wd = "WAprevalence/output/diagnostics")
@@ -41,7 +39,6 @@ MCMCvis::MCMCtrace(samples, params = "tau.f", filename = "tau.f", wd = "WApreval
 MCMCvis::MCMCtrace(samples, params = "tau.u", filename = "tau.u", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 1]"), ISB = F, filename = "eps.pmp", "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 2]"), ISB = F, filename = "eps.death", "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 3]"), ISB = F, filename = "eps.oud", "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = "cov.eps", filename = "cov.eps", wd = "WAprevalence/output/diagnostics")
 
 # EXTRACT POSTERIOR MEANS, 95% CrI (QUANTILES), SD AND NEW GR DIAGNOSTIC STAT
@@ -56,14 +53,12 @@ pmp_lwr <- which(names(results[[1]])=="pi[1, 1]")
 pmp_upr <- which(names(results[[1]])=="pi[234, 1]")
 death_lwr <- which(names(results[[1]])=="pi[1, 2]")
 death_upr <- which(names(results[[1]])=="pi[234, 2]")
-oud_lwr <- which(names(results[[1]])=="pi[1, 3]")
-oud_upr <- which(names(results[[1]])=="pi[234, 3]")
 N_lwr <- which(names(results[[1]]) == "N[1]")
 N_upr <- which(names(results[[1]]) == "N[234]")
 lambda_lwr <- which(names(results[[1]]) == "lambda[1]")
 lambda_upr <- which(names(results[[1]]) == "lambda[234]")
 beta_lwr <- which(names(results[[1]]) == "beta[1, 1]")
-beta_upr <- which(names(results[[1]]) == "beta[6, 3]")
+beta_upr <- which(names(results[[1]]) == "beta[6, 2]")
 mu_lwr <- which(names(results[[1]]) == "mu[1]")
 mu_upr <- which(names(results[[1]]) == "mu[6]")
 
@@ -81,7 +76,9 @@ results_to_tibble <- function(results, par) {
          lwr95 = results[[2]][1, par_lwr:par_upr],
          upr95 = results[[2]][2, par_lwr:par_upr],
          sd = results[[3]][par_lwr:par_upr],
-         gr = results[[4]][par_lwr:par_upr]
+         gr = results[[4]][par_lwr:par_upr],
+         pmp_obs_rate = (yfit$pmp/pop),
+         death_obs_rate = (yfit$death/pop)
          
   )
   
@@ -89,7 +86,6 @@ results_to_tibble <- function(results, par) {
 
 pmp_results <- results_to_tibble(results, "pmp")
 death_results <- results_to_tibble(results, "death")
-oud_results <- results_to_tibble(results, "oud")
 lambda_results <- results_to_tibble(results, "lambda") %>% 
                     mutate(CrI = case_when(
                                           lwr95 > 1  ~ "95% CrI > 1",
@@ -117,13 +113,6 @@ death_results_csv <-  death_results %>%
                                lwr95,
                                upr95)
 
-oud_results_csv <-  oud_results %>%
-                      select(county,
-                             year,
-                             mean,
-                             lwr95,
-                             upr95)
-
 N_results_csv <-  N_results %>%
                     select(county,
                            year,
@@ -144,10 +133,6 @@ write.csv(pmp_results_csv,
 
 write.csv(death_results_csv,
           file = "WAprevalence/output/tables/death_results.csv",
-          row.names = F)
-
-write.csv(oud_results_csv,
-          file = "WAprevalence/output/tables/oud_results.csv",
           row.names = F)
 
 write.csv(N_results_csv,
@@ -182,7 +167,7 @@ create_choropleth_map <- function(data, value, colorbar_type = NULL, colorbar_ti
   p <- {if(colorbar_type == "monotonic"){
     
     p + scale_fill_gradient(low = "white",
-                            high = "blue",
+                            high = "red",
                             guide = guide_colorbar(barheight = 12))
     
   } else if(colorbar_type == "diverging") {
@@ -222,12 +207,35 @@ create_choropleth_map <- function(data, value, colorbar_type = NULL, colorbar_ti
 }
 
 # generate and save maps
-pmp_map <- create_choropleth_map(data = pmp_results, value = mean, colorbar_type = "monotonic")
-death_map <- create_choropleth_map(data = death_results, value = mean, colorbar_type = "monotonic")
-oud_map <- create_choropleth_map(data = oud_results, value = mean, colorbar_type = "monotonic")
-lambda_map <- create_choropleth_map(data = lambda_results, value = mean, colorbar_type = "diverging")
-lambda_CrI_map <- create_choropleth_map(data = lambda_results, value = CrI, colorbar_type = "other") + theme(legend.position = "right")
-N_map <- create_choropleth_map(data = N_results, value = mean_prev, colorbar_type = "monotonic")
+
+  # observed maps
+  pmp_obs_rate_map <-  create_choropleth_map(data = pmp_results, value = pmp_obs_rate, colorbar_type = "monotonic")
+  death_obs_rate_map <-  create_choropleth_map(data = death_results, value = death_obs_rate, colorbar_type = "monotonic")
+  
+  # model maps
+  pmp_map <- create_choropleth_map(data = pmp_results, value = mean, colorbar_type = "monotonic")
+  death_map <- create_choropleth_map(data = death_results, value = mean, colorbar_type = "monotonic")
+  lambda_map <- create_choropleth_map(data = lambda_results, value = mean, colorbar_type = "diverging")
+  lambda_CrI_map <- create_choropleth_map(data = lambda_results, value = CrI, colorbar_type = "other") + theme(legend.position = "right")
+  N_map <- create_choropleth_map(data = N_results, value = mean_prev, colorbar_type = "monotonic")
+
+  
+ggsave(filename = "pmp_obs_rate.png", 
+       plot = pmp_obs_rate_map, 
+       path = "WAprevalence/output/maps", 
+       bg = "White",
+       dpi = "retina",
+       height = 3,
+       width = 10)
+
+ggsave(filename = "death_obs_rate.png", 
+       plot = death_obs_rate_map, 
+       path = "WAprevalence/output/maps", 
+       bg = "White",
+       dpi = "retina",
+       height = 3,
+       width = 10) 
+
 
 ggsave(filename = "pmp.png", 
        plot = pmp_map, 
@@ -239,14 +247,6 @@ ggsave(filename = "pmp.png",
 
 ggsave(filename = "death.png", 
        plot = death_map, 
-       path = "WAprevalence/output/maps", 
-       bg = "White",
-       dpi = "retina",
-       height = 3,
-       width = 10)
-
-ggsave(filename = "oud.png", 
-       plot = oud_map, 
        path = "WAprevalence/output/maps", 
        bg = "White",
        dpi = "retina",
@@ -283,10 +283,9 @@ ggsave(filename = "N.png",
 tibble(pred_beta = results[[1]][beta_lwr:beta_upr],
        lwr95 = results[[2]][1, beta_lwr:beta_upr],
        upr95 = results[[2]][2, beta_lwr:beta_upr],
-       year = rep(2017:2022, 3),
+       year = rep(2017:2022, 2),
        outcome = rep(c("pmp",
-                       "death",
-                       "oud"), each = 6)
+                       "death"), each = 6)
 ) %>%
   ggplot(aes(x = year, y = pred_beta, fill = outcome)) +
   geom_point(aes(color = outcome)) +
