@@ -284,8 +284,8 @@ tibble(pred_beta = results[[1]][beta_lwr:beta_upr],
        lwr95 = results[[2]][1, beta_lwr:beta_upr],
        upr95 = results[[2]][2, beta_lwr:beta_upr],
        year = rep(2017:2022, 2),
-       outcome = rep(c("pmp",
-                       "death"), each = 6)
+       outcome = rep(c("Buprenorphine prescription",
+                       "Death due to opioid misuse"), each = 6)
 ) %>%
   ggplot(aes(x = year, y = pred_beta, fill = outcome)) +
   geom_point(aes(color = outcome)) +
@@ -293,6 +293,11 @@ tibble(pred_beta = results[[1]][beta_lwr:beta_upr],
                 width = 0.05) +
   geom_line(linetype = "dashed", aes(color = outcome)) +
   geom_ribbon(aes(ymin = lwr95, ymax = upr95), alpha = 0.1) +
+  #scale_y_continuous(sec.axis = sec_axis(trans=~.*1, 
+  #                                       name="",
+  #                                       breaks = c(-6 ,-4, -2 , 0), 
+  #                                       labels = round(c(exp(-6), exp(-4), exp(-2), exp(0)), 2))
+  #) +
   theme_classic() +
   labs(color = "Outcome",
        fill = "Outcome",
@@ -302,7 +307,7 @@ tibble(pred_beta = results[[1]][beta_lwr:beta_upr],
 ggsave(filename = "beta_log_odds.png",
        path = "WAprevalence/output",
        dpi = "retina",
-       width = 12,
+       width = 13,
        height = 10,
        units = "cm"
 )
