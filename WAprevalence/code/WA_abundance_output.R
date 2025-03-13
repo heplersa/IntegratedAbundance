@@ -278,32 +278,49 @@ ggsave(filename = "N.png",
 
 # EXAMINE ESTIMATED TIME-VARYING INTERCEPTS FOR EACH OUTCOME
 
-# note that this is on the log-odds scale; no covariates so this shows the estimated state-wide prevalence of each outcome among PWMO on the logit scale
-tibble(pred_beta = results[[1]][beta_lwr:beta_upr],
-       lwr95 = results[[2]][1, beta_lwr:beta_upr],
-       upr95 = results[[2]][2, beta_lwr:beta_upr],
+# compute posterior distribution of statewide outcome prevalence
+post_outcome_prev <- apply(samples[, beta_lwr:beta_upr], 2, ilogit)
+
+# compute posterior statistics of interest: mean, 95% CrI
+post_outcome_prev <- list(colMeans(post_outcome_prev),
+                          apply(post_outcome_prev,2,
+                                quantile,probs=c(.025,.975)
+                                )
+                     )
+     
+
+# no covariates in the model, so this shows the estimated state-wide prevalence
+# of each outcome among PWMO on the log scale
+# y-axis ticks mapped to underlying prevalence value
+tibble(pred_beta = post_outcome_prev[[1]],
+       lwr95 = post_outcome_prev[[2]][1, ],
+       upr95 = post_outcome_prev[[2]][2, ],
        year = rep(2017:2022, 2),
        outcome = rep(c("Buprenorphine prescription",
                        "Death due to opioid misuse"), each = 6)
 ) %>%
+  mutate(across(c(pred_beta, lwr95, upr95), log)) %>%
   ggplot(aes(x = year, y = pred_beta, fill = outcome)) +
   geom_point(aes(color = outcome)) +
   geom_errorbar(aes(ymin = lwr95, ymax = upr95, color = outcome),
                 width = 0.05) +
   geom_line(linetype = "dashed", aes(color = outcome)) +
   geom_ribbon(aes(ymin = lwr95, ymax = upr95), alpha = 0.1) +
-  #scale_y_continuous(sec.axis = sec_axis(trans=~.*1, 
-  #                                       name="",
-  #                                       breaks = c(-6 ,-4, -2 , 0), 
-  #                                       labels = round(c(exp(-6), exp(-4), exp(-2), exp(0)), 2))
-  #) +
+  scale_y_continuous(
+                     breaks = c(-10:0),
+                     labels = round(c(0, exp(-9:0)), 3)
+                    # sec.axis = sec_axis(trans=~.*1, 
+                    #                     name="",
+                    #                     breaks = c(-6:0), 
+                    #                     labels = round(c(exp(-6), exp(-5), exp(-4), exp(-3), exp(-2), exp(-1), exp(0)), 2))
+  ) +
   theme_classic() +
   labs(color = "Outcome",
        fill = "Outcome",
        x = "Year",
-       y = "Estimated prevalence (log-odds)")
+       y = "Estimated prevalence")
 
-ggsave(filename = "beta_log_odds.png",
+ggsave(filename = "beta_log.png",
        path = "WAprevalence/output",
        dpi = "retina",
        width = 13,
@@ -374,3 +391,5 @@ ggsave("2_yr_mu_trend.png",
        width = 12,
        height = 10,
        units = "cm")
+
+
