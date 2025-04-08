@@ -14,6 +14,7 @@ library(tigris) # pull shape files from internet
 library(flextable) # make pretty tables
 library(biscale) # create biscale plots
 library(cowplot) # draw_plot
+library(spatialEco) # crossCorrelation
 
 # IMPORT PRE-PROCESSED DATA USED TO FIT MODEL. 
 load("WAprevalence/data/data_for_analysis.Rda")
@@ -480,5 +481,45 @@ ggsave("2_yr_mu_trend.png",
           units = "cm",
           bg = "white")
    
+# COMPUTE SPATIAL CROSS CORRELATION USING LOCAL MORAN'S I #
+
+   # compute adjacency matrix for NC counties
+   WA_map <- shape_county_WA[order(shape_county_WA$COUNTYFP),] #convert to data frame
    
+   nbmat <- poly2nb(WA_map)
+   
+   n <- length(shape_county_WA$NAME) # should be 39
+   
+   A <- matrix(0,n,n)
+   
+   for(i in 1:n){
+     
+     A[i,unlist(nbmat[[i]])]=1
+     
+   }
+   
+  # compute Moran's I for a given year of the data
+  crossCorrelation_year <- function(year) {
+    
+    crossCorrelation_data <- prev_pmp_data[prev_pmp_data$year == year,]
+    prev_est <- crossCorrelation_data %>% pull(prev_est)
+    pmp_est <- crossCorrelation_data %>% pull(pmp_est)
+    
+    crossCorrelation(prev_est,
+                     pmp_est,
+                     w = A,
+                     dist.function = "none")
+    
+  }
+   
+   # save crossCorrelation values
+   crossCorrelation_2017 <- crossCorrelation_year(2017)
+   crossCorrelation_2018 <- crossCorrelation_year(2018)
+   crossCorrelation_2019 <- crossCorrelation_year(2019)
+   crossCorrelation_2020 <- crossCorrelation_year(2020)
+   crossCorrelation_2021 <- crossCorrelation_year(2021)
+   crossCorrelation_2022 <- crossCorrelation_year(2022)
+ 
+  # examine results
+   crossCorrelation_2017
   
