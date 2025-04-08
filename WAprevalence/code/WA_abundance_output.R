@@ -12,6 +12,8 @@ library(ggthemes) # theme_map
 library(sf) # import shape files
 library(tigris) # pull shape files from internet
 library(flextable) # make pretty tables
+library(biscale) # create biscale plots
+library(cowplot) # draw_plot
 
 # IMPORT PRE-PROCESSED DATA USED TO FIT MODEL. 
 load("WAprevalence/data/data_for_analysis.Rda")
@@ -392,4 +394,91 @@ ggsave("2_yr_mu_trend.png",
        height = 10,
        units = "cm")
 
+# CREATE BISCALE PLOT #
 
+  # prepare data
+  prev_pmp_data <-  N_results %>%
+    select(county,
+           year,
+           mean_prev) %>%
+    left_join(pmp_results,
+              by = c("county", "year")) %>%
+    select(county,
+           year,
+           mean_prev,
+           mean) %>%
+    rename(prev_est = mean_prev,
+           pmp_est = mean)
+  
+  # for a given year, combine model estimates w/ spatial info & apply bi_class  
+  biscale_data_year <- function(year) {
+    
+     shape_county_WA %>%
+            mutate(NAME = tolower(NAME)) %>%
+            rename(county = NAME) %>%
+            left_join(prev_pmp_data[prev_pmp_data$year==year,],
+                      by = c("county")) %>%
+            bi_class(x = prev_est, 
+                     y = pmp_est,
+                     style = "quantile",
+                     dim = 3)
+    
+    
+    
+  }
+  
+  # create biscale class variable for each year
+  biscale_data_2017 <- biscale_data_year(2017)
+  biscale_data_2018 <- biscale_data_year(2018)
+  biscale_data_2019 <- biscale_data_year(2019)
+  biscale_data_2020 <- biscale_data_year(2020)
+  biscale_data_2021 <- biscale_data_year(2021)
+  biscale_data_2022 <- biscale_data_year(2022)
+
+
+  # stack data
+  biscale_data <- biscale_data_2017 %>%
+                    bind_rows(biscale_data_2018,
+                              biscale_data_2019,
+                              biscale_data_2020,
+                              biscale_data_2021,
+                              biscale_data_2022)
+
+  # create biscale plot
+  biscale_legend <- bi_legend(pal = "GrPink",
+                              dim = 3,
+                              xlab = "Prevalence",
+                              ylab = "Buprenorphine",
+                              size = 5)
+  
+  biscale_map <- biscale_data %>%
+                    ggplot() +
+                    geom_sf(aes(fill = bi_class), 
+                            color = "white",
+                            size = 0.1, 
+                            show.legend = F) +
+                      bi_scale_fill(pal = "GrPink", dim = 3) +
+                      facet_wrap(~year) +
+                      theme_map() +
+                      theme(strip.background = element_rect(fill = "white", color = NA),
+                            strip.text = element_text(color = "black",
+                                                      size = 12, 
+                                                      hjust = 0),
+                            legend.text = element_text(size = 12),
+                            legend.title = element_text(size = 12)
+                      )
+   
+   ggdraw() +
+     draw_plot(biscale_map, 0, 0, 1, 1) +
+     draw_plot(biscale_legend, 0.4, .8, 0.2, 0.2) 
+   
+   ggsave("biplot.png",
+          device="png",
+          path="WAprevalence/output/maps",
+          width = 12,
+          height = 10,
+          units = "cm",
+          bg = "white")
+   
+   
+  
