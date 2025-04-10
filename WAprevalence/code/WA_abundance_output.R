@@ -12,6 +12,10 @@ library(ggthemes) # theme_map
 library(sf) # import shape files
 library(tigris) # pull shape files from internet
 library(flextable) # make pretty tables
+library(biscale) # create biscale plots
+library(cowplot) # draw_plot
+library(spatialEco) # crossCorrelation
+library(spdep)
 
 # IMPORT PRE-PROCESSED DATA USED TO FIT MODEL. 
 load("WAprevalence/data/data_for_analysis.Rda")
@@ -392,4 +396,202 @@ ggsave("2_yr_mu_trend.png",
        height = 10,
        units = "cm")
 
+# CREATE BISCALE PLOT #
 
+  # prepare data
+  prev_pmp_data <-  N_results %>%
+    select(county,
+           year,
+           mean_prev) %>%
+    left_join(pmp_results,
+              by = c("county", "year")) %>%
+    select(county,
+           year,
+           mean_prev,
+           mean) %>%
+    rename(prev_est = mean_prev,
+           pmp_est = mean)
+  
+  # for a given year, combine model estimates w/ spatial info & apply bi_class  
+  biscale_data_year <- function(year) {
+    
+     shape_county_WA %>%
+            mutate(NAME = tolower(NAME)) %>%
+            rename(county = NAME) %>%
+            left_join(prev_pmp_data[prev_pmp_data$year==year,],
+                      by = c("county")) %>%
+            bi_class(x = prev_est, 
+                     y = pmp_est,
+                     style = "quantile",
+                     dim = 2)
+    
+    
+    
+  }
+  
+  # create biscale class variable for each year
+  biscale_data_2017 <- biscale_data_year(2017)
+  biscale_data_2018 <- biscale_data_year(2018)
+  biscale_data_2019 <- biscale_data_year(2019)
+  biscale_data_2020 <- biscale_data_year(2020)
+  biscale_data_2021 <- biscale_data_year(2021)
+  biscale_data_2022 <- biscale_data_year(2022)
+
+
+  # stack data
+  biscale_data <- biscale_data_2017 %>%
+                    bind_rows(biscale_data_2018,
+                              biscale_data_2019,
+                              biscale_data_2020,
+                              biscale_data_2021,
+                              biscale_data_2022)
+
+  # create biscale plot
+  biscale_legend <- bi_legend(pal = "GrPink",
+                              dim = 2,
+                              xlab = "Prevalence",
+                              ylab = "Buprenorphine",
+                              size = 5)
+  
+  biscale_map <- biscale_data %>%
+                    ggplot() +
+                    geom_sf(aes(fill = bi_class), 
+                            color = "white",
+                            size = 0.1, 
+                            show.legend = F) +
+                      bi_scale_fill(pal = "GrPink", dim = 2) +
+                      facet_wrap(~year) +
+                      theme_map() +
+                      theme(strip.background = element_rect(fill = "white", color = NA),
+                            strip.text = element_text(color = "black",
+                                                      size = 12, 
+                                                      hjust = 0),
+                            legend.text = element_text(size = 12),
+                            legend.title = element_text(size = 12)
+                      )
+   
+   ggdraw() +
+     draw_plot(biscale_map, 0, 0, 1, 1) +
+     draw_plot(biscale_legend, 0.4, .8, 0.2, 0.2) 
+   
+   ggsave("biplot_2dim.png",
+          device="png",
+          path="WAprevalence/output/maps",
+          width = 12,
+          height = 10,
+          units = "cm",
+          bg = "white")
+   
+# COMPUTE SPATIAL CROSS CORRELATION USING LOCAL MORAN'S I #
+
+   # compute adjacency matrix for NC counties
+   WA_map <- shape_county_WA[order(shape_county_WA$COUNTYFP),] #convert to data frame
+   
+   nbmat <- poly2nb(WA_map)
+   
+   n <- length(shape_county_WA$NAME) # should be 39
+   
+   A <- matrix(0,n,n)
+   
+   for(i in 1:n){
+     
+     A[i,unlist(nbmat[[i]])]=1
+     
+   }
+   
+  # compute Moran's I for a given year of the data
+  crossCorrelation_year <- function(year) {
+    
+    crossCorrelation_data <- prev_pmp_data[prev_pmp_data$year == year,]
+    prev_est <- crossCorrelation_data %>% pull(prev_est)
+    pmp_est <- crossCorrelation_data %>% pull(pmp_est)
+    
+    crossCorrelation(prev_est,
+                     pmp_est,
+                     w = A,
+                     dist.function = "none")
+    
+  }
+   
+   # save crossCorrelation values
+   crossCorrelation_2017 <- crossCorrelation_year(2017)
+   crossCorrelation_2018 <- crossCorrelation_year(2018)
+   crossCorrelation_2019 <- crossCorrelation_year(2019)
+   crossCorrelation_2020 <- crossCorrelation_year(2020)
+   crossCorrelation_2021 <- crossCorrelation_year(2021)
+   crossCorrelation_2022 <- crossCorrelation_year(2022)
+ 
+  # extract clusters and put into data frame
+   cluster_data <- function(data, year) {
+     
+     prev_pmp_data_year <- prev_pmp_data[prev_pmp_data$year==year,] %>%
+       mutate(cluster = data$clusters,
+              bi_class = case_when(
+                cluster == "Low.Low" ~ "1-1",
+                cluster == "Low.High" ~ "1-2",
+                cluster == "High.Low" ~ "2-1",
+                cluster == "High.High" ~ "2-2"
+               )
+              )
+     
+     shape_county_WA %>%
+       mutate(NAME = tolower(NAME)) %>%
+       rename(county = NAME) %>%
+       left_join(prev_pmp_data_year,
+                 by = c("county"))
+   
+   }
+   
+   # extract tidy cluster data for each year
+   cluster_data_2017 <- cluster_data(crossCorrelation_2017, 2017)
+   cluster_data_2018 <- cluster_data(crossCorrelation_2018, 2018)
+   cluster_data_2019 <- cluster_data(crossCorrelation_2019, 2019)
+   cluster_data_2020 <- cluster_data(crossCorrelation_2020, 2020)
+   cluster_data_2021 <- cluster_data(crossCorrelation_2021, 2021)
+   cluster_data_2022 <- cluster_data(crossCorrelation_2022, 2022)
+   
+   # stack data
+   cluster_data <- cluster_data_2017 %>%
+                      bind_rows(cluster_data_2018,
+                                cluster_data_2019,
+                                cluster_data_2020,
+                                cluster_data_2021,
+                                cluster_data_2022)
+   
+   # create biscale plot using cluster from crossCorrelation
+   cluster_legend <- bi_legend(pal = "GrPink",
+                               dim = 2,
+                               xlab = "Prevalence",
+                               ylab = "Buprenorphine",
+                               size = 5)
+   
+   cluster_map <- cluster_data %>%
+     ggplot() +
+     geom_sf(aes(fill = bi_class), 
+             color = "white",
+             size = 0.1, 
+             show.legend = F) +
+     bi_scale_fill(pal = "GrPink", dim = 2) +
+     facet_wrap(~year) +
+     theme_map() +
+     theme(strip.background = element_rect(fill = "white", color = NA),
+           strip.text = element_text(color = "black",
+                                     size = 12, 
+                                     hjust = 0),
+           legend.text = element_text(size = 12),
+           legend.title = element_text(size = 12)
+     )
+   
+   ggdraw() +
+     draw_plot(cluster_map, 0, 0, 1, 1) +
+     draw_plot(cluster_legend, 0.4, .8, 0.2, 0.2) 
+   
+   ggsave("crossCorr_biplot_2dim.png",
+          device="png",
+          path="WAprevalence/output/maps",
+          width = 12,
+          height = 10,
+          units = "cm",
+          bg = "white")
+   
+  
