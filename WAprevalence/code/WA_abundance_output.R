@@ -15,6 +15,7 @@ library(flextable) # make pretty tables
 library(biscale) # create biscale plots
 library(cowplot) # draw_plot
 library(spatialEco) # crossCorrelation
+library(spdep)
 
 # IMPORT PRE-PROCESSED DATA USED TO FIT MODEL. 
 load("WAprevalence/data/data_for_analysis.Rda")
@@ -422,7 +423,7 @@ ggsave("2_yr_mu_trend.png",
             bi_class(x = prev_est, 
                      y = pmp_est,
                      style = "quantile",
-                     dim = 3)
+                     dim = 2)
     
     
     
@@ -447,7 +448,7 @@ ggsave("2_yr_mu_trend.png",
 
   # create biscale plot
   biscale_legend <- bi_legend(pal = "GrPink",
-                              dim = 3,
+                              dim = 2,
                               xlab = "Prevalence",
                               ylab = "Buprenorphine",
                               size = 5)
@@ -458,7 +459,7 @@ ggsave("2_yr_mu_trend.png",
                             color = "white",
                             size = 0.1, 
                             show.legend = F) +
-                      bi_scale_fill(pal = "GrPink", dim = 3) +
+                      bi_scale_fill(pal = "GrPink", dim = 2) +
                       facet_wrap(~year) +
                       theme_map() +
                       theme(strip.background = element_rect(fill = "white", color = NA),
@@ -473,7 +474,7 @@ ggsave("2_yr_mu_trend.png",
      draw_plot(biscale_map, 0, 0, 1, 1) +
      draw_plot(biscale_legend, 0.4, .8, 0.2, 0.2) 
    
-   ggsave("biplot.png",
+   ggsave("biplot_2dim.png",
           device="png",
           path="WAprevalence/output/maps",
           width = 12,
@@ -520,6 +521,77 @@ ggsave("2_yr_mu_trend.png",
    crossCorrelation_2021 <- crossCorrelation_year(2021)
    crossCorrelation_2022 <- crossCorrelation_year(2022)
  
-  # examine results
-   crossCorrelation_2017
+  # extract clusters and put into data frame
+   cluster_data <- function(data, year) {
+     
+     prev_pmp_data_year <- prev_pmp_data[prev_pmp_data$year==year,] %>%
+       mutate(cluster = data$clusters,
+              bi_class = case_when(
+                cluster == "Low.Low" ~ "1-1",
+                cluster == "Low.High" ~ "1-2",
+                cluster == "High.Low" ~ "2-1",
+                cluster == "High.High" ~ "2-2"
+               )
+              )
+     
+     shape_county_WA %>%
+       mutate(NAME = tolower(NAME)) %>%
+       rename(county = NAME) %>%
+       left_join(prev_pmp_data_year,
+                 by = c("county"))
+   
+   }
+   
+   # extract tidy cluster data for each year
+   cluster_data_2017 <- cluster_data(crossCorrelation_2017, 2017)
+   cluster_data_2018 <- cluster_data(crossCorrelation_2018, 2018)
+   cluster_data_2019 <- cluster_data(crossCorrelation_2019, 2019)
+   cluster_data_2020 <- cluster_data(crossCorrelation_2020, 2020)
+   cluster_data_2021 <- cluster_data(crossCorrelation_2021, 2021)
+   cluster_data_2022 <- cluster_data(crossCorrelation_2022, 2022)
+   
+   # stack data
+   cluster_data <- cluster_data_2017 %>%
+                      bind_rows(cluster_data_2018,
+                                cluster_data_2019,
+                                cluster_data_2020,
+                                cluster_data_2021,
+                                cluster_data_2022)
+   
+   # create biscale plot using cluster from crossCorrelation
+   cluster_legend <- bi_legend(pal = "GrPink",
+                               dim = 2,
+                               xlab = "Prevalence",
+                               ylab = "Buprenorphine",
+                               size = 5)
+   
+   cluster_map <- cluster_data %>%
+     ggplot() +
+     geom_sf(aes(fill = bi_class), 
+             color = "white",
+             size = 0.1, 
+             show.legend = F) +
+     bi_scale_fill(pal = "GrPink", dim = 2) +
+     facet_wrap(~year) +
+     theme_map() +
+     theme(strip.background = element_rect(fill = "white", color = NA),
+           strip.text = element_text(color = "black",
+                                     size = 12, 
+                                     hjust = 0),
+           legend.text = element_text(size = 12),
+           legend.title = element_text(size = 12)
+     )
+   
+   ggdraw() +
+     draw_plot(cluster_map, 0, 0, 1, 1) +
+     draw_plot(cluster_legend, 0.4, .8, 0.2, 0.2) 
+   
+   ggsave("crossCorr_biplot_2dim.png",
+          device="png",
+          path="WAprevalence/output/maps",
+          width = 12,
+          height = 10,
+          units = "cm",
+          bg = "white")
+   
   
