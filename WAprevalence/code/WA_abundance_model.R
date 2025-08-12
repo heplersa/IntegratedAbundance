@@ -134,7 +134,7 @@ model_code <- nimbleCode({
 # DEFINE NIMBLE CONSTANTS, DATA, and INITS
 n <- length(num) # number of WA counties
 T <- length(2017:2022) # number of years
-K <-  dim(yfit[, 6:7])[2] # number of outcomes
+K <-  dim(yfit[, c("pmp", "death")])[2] # number of outcomes
 
 mod_constants <- list(R = n,
                       T = T,
@@ -151,7 +151,7 @@ mod_constants <- list(R = n,
                       cov.eps.R = diag(K)
 )
 
-mod_data <- list(y=as.matrix(yfit[,6:7]),
+mod_data <- list(y=as.matrix(yfit[,c("pmp", "death")]),
                  S=logit_S
 )
 
@@ -167,23 +167,23 @@ II <- which(Ninit > yfit$pop)
 
 if(length(II) > 0){
   
-  Ninit[II] <- floor(.1*yfit[II, 8])
+  Ninit[II] <- floor(.1*yfit[II, "pop"])
   
 }
 
-II <- which(Ninit < yfit[,6])
+II <- which(Ninit < yfit[,"pmp"])
 
 if(length(II) > 0){
   
-  Ninit[II] <- yfit[II,6] + 100
+  Ninit[II] <- yfit[II,"pmp"] + 100
   
 }
 
-II <- which(Ninit < yfit[,7])
+II <- which(Ninit < yfit[,"death"])
 
 if(length(II) > 0){
   
-  Ninit[II] <- yfit[II,7] + 100
+  Ninit[II] <- yfit[II,"death"] + 100
   
 }
 
@@ -263,7 +263,7 @@ compiled_mcmc <- compileNimble(nimble_mcmc, project = nimble_model, resetFunctio
 
 
 # Run the model 
-set.seed(2)
+set.seed(2025)
 MCS <- 1*10^6
 st  <- Sys.time()
 samples <- runMCMC(compiled_mcmc,
@@ -282,4 +282,4 @@ Sys.time()-st
 
 MCMCvis::MCMCtrace(samples, pdf = F, params = "pi")
 
-save(samples, file = "WAprevalence/output/MCMC_no_covariates.Rda")
+save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_2025_08_12.Rda")

@@ -76,24 +76,37 @@ library(tidycensus) # pull pop data from US Census
 # source: confidential data; pulled by Dave Kline Jan 2025
   
   # import raw data
-  outcomes_raw <- read.csv("WAprevalence/data/outcomes/Single_year_crc_file.csv")
+  outcomes_raw <- read.csv("WAprevalence/data/outcomes/final_county_data_single_year_with_unknown.csv")
+  
   # process raw data
   
     # extract pmp and death marginal counts from encoded 2x2 tables in raw data; combine with population data
+    # outcomes_processed <- outcomes_raw %>%
+    #                        filter(county != "UNKNOWN") %>%
+    #                        group_by(year, county, pmp, death) %>%
+    #                        summarise(oud_sum = sum(OUD)) %>%
+    #                        pivot_wider(names_from = c(pmp, death),
+    #                                    values_from = oud_sum) %>%
+    #                        mutate(across(c(`1_0`, `0_1`, `1_1`), function(x) if_else(is.na(x)==T, 0, x))) %>%
+    #                        rowwise() %>%
+    #                        mutate(pmp = sum(`1_0`,`1_1`, na.rm = T),
+    #                               death = sum(`0_1` + `1_1`, na.rm =T)
+    #                        ) %>%
+    #                        mutate(county = tolower(county)) %>%
+    #                        left_join(WA_county_pop_processed,
+    #                                  by = c("year", "county"))
+    
+    # extract marginal county by year counts for pmp_oud and death_oud using latest data
     outcomes_processed <- outcomes_raw %>%
-                            filter(county != "UNKNOWN") %>%
-                            group_by(year, county, pmp, death) %>%
-                            summarise(oud_sum = sum(OUD)) %>%
-                            pivot_wider(names_from = c(pmp, death),
-                                        values_from = oud_sum) %>%
-                            mutate(across(c(`1_0`, `0_1`, `1_1`), function(x) if_else(is.na(x)==T, 0, x))) %>%
-                            rowwise() %>%
-                            mutate(pmp = sum(`1_0`,`1_1`, na.rm = T),
-                                   death = sum(`0_1` + `1_1`, na.rm =T)
-                            ) %>%
-                            mutate(county = tolower(county)) %>%
-                            left_join(WA_county_pop_processed,
-                                      by = c("year", "county"))
+            filter(final_county != "Unknown") %>%
+            group_by(final_county, year) %>% 
+            summarise(pmp = sum(pmp_oud),
+                      death = sum(death_oud)) %>%
+            filter(year < 2023) %>%
+            rename(county = final_county) %>%
+            mutate(county = tolower(county)) %>%
+            left_join(WA_county_pop_processed,
+                      by = c("year", "county"))
   
   # check that there is no missing data in marginal outcomes
   apply(outcomes_processed[, c("pmp", "death")], 2, function(x) sum(is.na(x))) == c(0, 0)
