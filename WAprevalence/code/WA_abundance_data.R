@@ -76,7 +76,12 @@ library(tidycensus) # pull pop data from US Census
 # source: confidential data; pulled by Dave Kline Jan 2025
   
   # import raw data
-  outcomes_raw <- read.csv("WAprevalence/data/outcomes/final_county_data_single_year_with_unknown.csv")
+  
+    # original data 
+    #outcomes_raw <- read.csv("WAprevalence/data/outcomes/Single_year_crc_file.csv")
+    
+    # summer 2025 update 
+    outcomes_raw <- read.csv("WAprevalence/data/outcomes/final_county_data_single_year_dedupe_with_unknowns.csv")
   
   # process raw data
   

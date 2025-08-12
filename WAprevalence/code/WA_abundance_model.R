@@ -280,6 +280,4 @@ samples <- runMCMC(compiled_mcmc,
 
 Sys.time()-st
 
-MCMCvis::MCMCtrace(samples, pdf = F, params = "pi")
-
 save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_2025_08_12.Rda")

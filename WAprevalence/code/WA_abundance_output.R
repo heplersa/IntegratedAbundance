@@ -21,7 +21,7 @@ library(spdep)
 load("WAprevalence/data/data_for_analysis.Rda")
 
 # IMPORT MCMC OUTPUT FROM MODEL
-load("WAprevalence/output/mcmc/MCMC_no_covariates.Rda")
+load("WAprevalence/output/mcmc/MCMC_no_covariates_2025_08_12.Rda")
 
 # IMPORT SHAPE FILES FOR WA COUNTIES
 load("WAprevalence/data/shape_county_WA.Rda")
@@ -224,7 +224,7 @@ create_choropleth_map <- function(data, value, colorbar_type = NULL, colorbar_ti
   N_map <- create_choropleth_map(data = N_results, value = mean_prev, colorbar_type = "monotonic")
 
   
-ggsave(filename = "pmp_obs_rate.png", 
+ggsave(filename = "pmp_obs_rate2.png", 
        plot = pmp_obs_rate_map, 
        path = "WAprevalence/output/maps", 
        bg = "White",
@@ -232,7 +232,7 @@ ggsave(filename = "pmp_obs_rate.png",
        height = 3,
        width = 10)
 
-ggsave(filename = "death_obs_rate.png", 
+ggsave(filename = "death_obs_rate2.png", 
        plot = death_obs_rate_map, 
        path = "WAprevalence/output/maps", 
        bg = "White",
@@ -240,7 +240,7 @@ ggsave(filename = "death_obs_rate.png",
        height = 3,
        width = 10) 
 
-ggsave(filename = "pmp.png", 
+ggsave(filename = "pmp2.png", 
        plot = pmp_map, 
        path = "WAprevalence/output/maps", 
        bg = "White",
@@ -248,7 +248,7 @@ ggsave(filename = "pmp.png",
        height = 3,
        width = 10)
 
-ggsave(filename = "death.png", 
+ggsave(filename = "death2.png", 
        plot = death_map, 
        path = "WAprevalence/output/maps", 
        bg = "White",
@@ -256,7 +256,7 @@ ggsave(filename = "death.png",
        height = 3,
        width = 10)
 
-ggsave(filename = "lambda.png", 
+ggsave(filename = "lambda2.png", 
        plot = lambda_map, 
        path = "WAprevalence/output/maps", 
        bg = "White",
@@ -264,7 +264,7 @@ ggsave(filename = "lambda.png",
        height = 3,
        width = 10)
 
-ggsave(filename = "lambda_CrI.png", 
+ggsave(filename = "lambda_CrI2.png", 
        plot = lambda_CrI_map, 
        path = "WAprevalence/output/maps", 
        bg = "White",
@@ -272,7 +272,7 @@ ggsave(filename = "lambda_CrI.png",
        height = 3,
        width = 10)
 
-ggsave(filename = "N.png", 
+ggsave(filename = "N2.png", 
        plot = N_map, 
        path = "WAprevalence/output/maps", 
        bg = "White",
@@ -292,7 +292,6 @@ post_outcome_prev <- list(colMeans(post_outcome_prev),
                                 )
                      )
      
-
 # no covariates in the model, so this shows the estimated state-wide prevalence
 # of each outcome among PWMO on the log scale
 # y-axis ticks mapped to underlying prevalence value
@@ -593,5 +592,3 @@ ggsave("2_yr_mu_trend.png",
           height = 10,
           units = "cm",
           bg = "white")
-   
-  
