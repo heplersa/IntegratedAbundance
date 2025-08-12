@@ -222,9 +222,8 @@ create_choropleth_map <- function(data, value, colorbar_type = NULL, colorbar_ti
   lambda_map <- create_choropleth_map(data = lambda_results, value = mean, colorbar_type = "diverging")
   lambda_CrI_map <- create_choropleth_map(data = lambda_results, value = CrI, colorbar_type = "other") + theme(legend.position = "right")
   N_map <- create_choropleth_map(data = N_results, value = mean_prev, colorbar_type = "monotonic")
-
   
-ggsave(filename = "pmp_obs_rate2.png", 
+ggsave(filename = "pmp_obs_rate.png", 
        plot = pmp_obs_rate_map, 
        path = "WAprevalence/output/maps", 
        bg = "White",
@@ -232,7 +231,7 @@ ggsave(filename = "pmp_obs_rate2.png",
        height = 3,
        width = 10)
 
-ggsave(filename = "death_obs_rate2.png", 
+ggsave(filename = "death_obs_rate.png", 
        plot = death_obs_rate_map, 
        path = "WAprevalence/output/maps", 
        bg = "White",
@@ -240,7 +239,7 @@ ggsave(filename = "death_obs_rate2.png",
        height = 3,
        width = 10) 
 
-ggsave(filename = "pmp2.png", 
+ggsave(filename = "pmp.png", 
        plot = pmp_map, 
        path = "WAprevalence/output/maps", 
        bg = "White",
@@ -248,7 +247,7 @@ ggsave(filename = "pmp2.png",
        height = 3,
        width = 10)
 
-ggsave(filename = "death2.png", 
+ggsave(filename = "death.png", 
        plot = death_map, 
        path = "WAprevalence/output/maps", 
        bg = "White",
@@ -256,7 +255,7 @@ ggsave(filename = "death2.png",
        height = 3,
        width = 10)
 
-ggsave(filename = "lambda2.png", 
+ggsave(filename = "lambda.png", 
        plot = lambda_map, 
        path = "WAprevalence/output/maps", 
        bg = "White",
@@ -264,7 +263,7 @@ ggsave(filename = "lambda2.png",
        height = 3,
        width = 10)
 
-ggsave(filename = "lambda_CrI2.png", 
+ggsave(filename = "lambda_CrI.png", 
        plot = lambda_CrI_map, 
        path = "WAprevalence/output/maps", 
        bg = "White",
@@ -272,7 +271,7 @@ ggsave(filename = "lambda_CrI2.png",
        height = 3,
        width = 10)
 
-ggsave(filename = "N2.png", 
+ggsave(filename = "N.png", 
        plot = N_map, 
        path = "WAprevalence/output/maps", 
        bg = "White",
@@ -435,7 +434,6 @@ ggsave("2_yr_mu_trend.png",
   biscale_data_2020 <- biscale_data_year(2020)
   biscale_data_2021 <- biscale_data_year(2021)
   biscale_data_2022 <- biscale_data_year(2022)
-
 
   # stack data
   biscale_data <- biscale_data_2017 %>%

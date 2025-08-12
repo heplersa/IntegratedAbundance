@@ -115,7 +115,6 @@ model_code <- nimbleCode({
       
     }
     
-    tau[j] ~ dgamma(.5,.5) # variance parameters for unexplained heterogeneity in data level
     phi.f[j] ~ dunif(0,1) # auto-regressive parameters for spatial random effect in data level
     tau.f[j] ~ dgamma(.5,.5) # variance parameters for for spatial random effect in data level
     
@@ -195,7 +194,6 @@ mod_inits <- list(N = Ninit,
                   u = uinit,
                   f = finit,
                   v = rep(0, n*T),
-                  tau = rep(.1, K), 
                   phi.u = .5, 
                   phi.f = rep(.5, K), 
                   beta.mu = logit_beta.mu.init
@@ -212,8 +210,7 @@ compiled_model <- compileNimble(nimble_model,
 
 # Set up samplers.
 mcmc_conf <- configureMCMC(nimble_model,
-                           monitors=c('tau',
-                                      'tau.u',
+                           monitors=c('tau.u',
                                       'tau.f',
                                       'eps',
                                       'cov.eps',
@@ -279,5 +276,4 @@ samples <- runMCMC(compiled_mcmc,
                    setSeed = 2) 
 
 Sys.time()-st
-
 save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_2025_08_12.Rda")
