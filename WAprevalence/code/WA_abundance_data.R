@@ -86,20 +86,20 @@ library(tidycensus) # pull pop data from US Census
   # process raw data
   
     # extract pmp and death marginal counts from encoded 2x2 tables in raw data; combine with population data
-    # outcomes_processed <- outcomes_raw %>%
-    #                        filter(county != "UNKNOWN") %>%
-    #                        group_by(year, county, pmp, death) %>%
-    #                        summarise(oud_sum = sum(OUD)) %>%
-    #                        pivot_wider(names_from = c(pmp, death),
-    #                                    values_from = oud_sum) %>%
-    #                        mutate(across(c(`1_0`, `0_1`, `1_1`), function(x) if_else(is.na(x)==T, 0, x))) %>%
-    #                        rowwise() %>%
-    #                        mutate(pmp = sum(`1_0`,`1_1`, na.rm = T),
-    #                               death = sum(`0_1` + `1_1`, na.rm =T)
-    #                        ) %>%
-    #                        mutate(county = tolower(county)) %>%
-    #                        left_join(WA_county_pop_processed,
-    #                                  by = c("year", "county"))
+    outcomes_processed <- outcomes_raw %>%
+                            filter(county != "UNKNOWN") %>%
+                            group_by(year, county, pmp, death) %>%
+                            summarise(oud_sum = sum(OUD)) %>%
+                            pivot_wider(names_from = c(pmp, death),
+                                        values_from = oud_sum) %>%
+                            mutate(across(c(`1_0`, `0_1`, `1_1`), function(x) if_else(is.na(x)==T, 0, x))) %>%
+                            rowwise() %>%
+                            mutate(pmp = sum(`1_0`,`1_1`, na.rm = T),
+                                   death = sum(`0_1` + `1_1`, na.rm =T)
+                            ) %>%
+                            mutate(county = tolower(county)) %>%
+                            left_join(WA_county_pop_processed,
+                                      by = c("year", "county"))
     
     # extract marginal county by year counts for pmp_oud and death_oud using latest data
     outcomes_processed <- outcomes_raw %>%
@@ -111,7 +111,8 @@ library(tidycensus) # pull pop data from US Census
             rename(county = final_county) %>%
             mutate(county = tolower(county)) %>%
             left_join(WA_county_pop_processed,
-                      by = c("year", "county"))
+                      by = c("year", "county")) %>%
+            arrange(year, county)
   
   # check that there is no missing data in marginal outcomes
   apply(outcomes_processed[, c("pmp", "death")], 2, function(x) sum(is.na(x))) == c(0, 0)
@@ -119,7 +120,7 @@ library(tidycensus) # pull pop data from US Census
   nrow(outcomes_processed) == 6*39
   
   # rename for use in Bayesian model
-  yfit <- outcomes_processed
+  yfit2 <- outcomes_processed
 
 # PREPARE STATE-LEVEL SURVEY DATA FOR PREVALENCE OF OPIOID MISUSE WITHIN LAST YEAR
 

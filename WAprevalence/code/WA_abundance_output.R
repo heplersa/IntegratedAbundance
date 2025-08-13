@@ -21,7 +21,7 @@ library(spdep)
 load("WAprevalence/data/data_for_analysis.Rda")
 
 # IMPORT MCMC OUTPUT FROM MODEL
-load("WAprevalence/output/mcmc/MCMC_no_covariates_2025_08_12.Rda")
+load("WAprevalence/output/mcmc/MCMC_no_covariates.Rda")
 
 # IMPORT SHAPE FILES FOR WA COUNTIES
 load("WAprevalence/data/shape_county_WA.Rda")
