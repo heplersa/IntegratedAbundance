@@ -115,7 +115,6 @@ model_code <- nimbleCode({
       
     }
     
-    tau[j] ~ dgamma(.5,.5) # variance parameters for unexplained heterogeneity in data level
     phi.f[j] ~ dunif(0,1) # auto-regressive parameters for spatial random effect in data level
     tau.f[j] ~ dgamma(.5,.5) # variance parameters for for spatial random effect in data level
     
@@ -133,8 +132,8 @@ model_code <- nimbleCode({
 
 # DEFINE NIMBLE CONSTANTS, DATA, and INITS
 n <- length(num) # number of WA counties
-T <- length(2017:2022) # number of years
-K <-  dim(yfit[, 6:7])[2] # number of outcomes
+T <- length(2017:2023) # number of years
+K <-  dim(yfit[, c("pmp", "death")])[2] # number of outcomes
 
 mod_constants <- list(R = n,
                       T = T,
@@ -151,7 +150,7 @@ mod_constants <- list(R = n,
                       cov.eps.R = diag(K)
 )
 
-mod_data <- list(y=as.matrix(yfit[,6:7]),
+mod_data <- list(y=as.matrix(yfit[,c("pmp", "death")]),
                  S=logit_S
 )
 
@@ -167,23 +166,23 @@ II <- which(Ninit > yfit$pop)
 
 if(length(II) > 0){
   
-  Ninit[II] <- floor(.1*yfit[II, 8])
+  Ninit[II] <- floor(.1*yfit[II, "pop"])
   
 }
 
-II <- which(Ninit < yfit[,6])
+II <- which(Ninit < yfit[,"pmp"])
 
 if(length(II) > 0){
   
-  Ninit[II] <- yfit[II,6] + 100
+  Ninit[II] <- yfit[II,"pmp"] + 100
   
 }
 
-II <- which(Ninit < yfit[,7])
+II <- which(Ninit < yfit[,"death"])
 
 if(length(II) > 0){
   
-  Ninit[II] <- yfit[II,7] + 100
+  Ninit[II] <- yfit[II,"death"] + 100
   
 }
 
@@ -195,7 +194,6 @@ mod_inits <- list(N = Ninit,
                   u = uinit,
                   f = finit,
                   v = rep(0, n*T),
-                  tau = rep(.1, K), 
                   phi.u = .5, 
                   phi.f = rep(.5, K), 
                   beta.mu = logit_beta.mu.init
@@ -212,8 +210,7 @@ compiled_model <- compileNimble(nimble_model,
 
 # Set up samplers.
 mcmc_conf <- configureMCMC(nimble_model,
-                           monitors=c('tau',
-                                      'tau.u',
+                           monitors=c('tau.u',
                                       'tau.f',
                                       'eps',
                                       'cov.eps',
@@ -263,7 +260,7 @@ compiled_mcmc <- compileNimble(nimble_mcmc, project = nimble_model, resetFunctio
 
 
 # Run the model 
-set.seed(2)
+set.seed(2025)
 MCS <- 1*10^6
 st  <- Sys.time()
 samples <- runMCMC(compiled_mcmc,
@@ -279,7 +276,4 @@ samples <- runMCMC(compiled_mcmc,
                    setSeed = 2) 
 
 Sys.time()-st
-
-MCMCvis::MCMCtrace(samples, pdf = F, params = "pi")
-
-save(samples, file = "WAprevalence/output/MCMC_no_covariates.Rda")
+save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_2025_08_12.Rda")
