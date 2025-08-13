@@ -70,7 +70,7 @@ library(tidycensus) # pull pop data from US Census
                                 mutate(across(c(year, pop),
                                               as.numeric)) %>%
                                 mutate(county = str_to_lower(county)) %>%
-                                filter(year %in% 2017:2022)
+                                filter(year %in% 2017:2023)
 
 # outcome variables: 3 outcomes (pmp, death, OUD), 6 years (2017-2022), 39 counties
 # source: confidential data; pulled by Dave Kline Jan 2025
@@ -80,26 +80,26 @@ library(tidycensus) # pull pop data from US Census
     # original data 
     #outcomes_raw <- read.csv("WAprevalence/data/outcomes/Single_year_crc_file.csv")
     
-    # summer 2025 update 
+    # summer 2025 update; expand study period to 2017-2023 (so add 2023)
     outcomes_raw <- read.csv("WAprevalence/data/outcomes/final_county_data_single_year_dedupe_with_unknowns.csv")
   
   # process raw data
   
     # extract pmp and death marginal counts from encoded 2x2 tables in raw data; combine with population data
-    outcomes_processed <- outcomes_raw %>%
-                            filter(county != "UNKNOWN") %>%
-                            group_by(year, county, pmp, death) %>%
-                            summarise(oud_sum = sum(OUD)) %>%
-                            pivot_wider(names_from = c(pmp, death),
-                                        values_from = oud_sum) %>%
-                            mutate(across(c(`1_0`, `0_1`, `1_1`), function(x) if_else(is.na(x)==T, 0, x))) %>%
-                            rowwise() %>%
-                            mutate(pmp = sum(`1_0`,`1_1`, na.rm = T),
-                                   death = sum(`0_1` + `1_1`, na.rm =T)
-                            ) %>%
-                            mutate(county = tolower(county)) %>%
-                            left_join(WA_county_pop_processed,
-                                      by = c("year", "county"))
+    #outcomes_processed <- outcomes_raw %>%
+    #                        filter(county != "UNKNOWN") %>%
+    #                        group_by(year, county, pmp, death) %>%
+    #                        summarise(oud_sum = sum(OUD)) %>%
+    #                        pivot_wider(names_from = c(pmp, death),
+    #                                    values_from = oud_sum) %>%
+    #                        mutate(across(c(`1_0`, `0_1`, `1_1`), function(x) if_else(is.na(x)==T, 0, x))) %>%
+    #                        rowwise() %>%
+    #                        mutate(pmp = sum(`1_0`,`1_1`, na.rm = T),
+    #                               death = sum(`0_1` + `1_1`, na.rm =T)
+    #                        ) %>%
+    #                        mutate(county = tolower(county)) %>%
+    #                        left_join(WA_county_pop_processed,
+    #                                  by = c("year", "county"))
     
     # extract marginal county by year counts for pmp_oud and death_oud using latest data
     outcomes_processed <- outcomes_raw %>%
@@ -107,7 +107,6 @@ library(tidycensus) # pull pop data from US Census
             group_by(final_county, year) %>% 
             summarise(pmp = sum(pmp_oud),
                       death = sum(death_oud)) %>%
-            filter(year < 2023) %>%
             rename(county = final_county) %>%
             mutate(county = tolower(county)) %>%
             left_join(WA_county_pop_processed,
@@ -117,17 +116,17 @@ library(tidycensus) # pull pop data from US Census
   # check that there is no missing data in marginal outcomes
   apply(outcomes_processed[, c("pmp", "death")], 2, function(x) sum(is.na(x))) == c(0, 0)
   # check that all counties-years are present; 6 years x 39 counties = 234 rows
-  nrow(outcomes_processed) == 6*39
+  nrow(outcomes_processed) == 7*39
   
   # rename for use in Bayesian model
-  yfit2 <- outcomes_processed
+  yfit <- outcomes_processed
 
 # PREPARE STATE-LEVEL SURVEY DATA FOR PREVALENCE OF OPIOID MISUSE WITHIN LAST YEAR
 
 # load state-level survey data from NSDUH using the SAMHSA datatools web application.
 # source: https://datatools.samhsa.gov/
 
-  # pull raw data  
+  # pull raw data; no restricted use 2022-2023 data available as of early August 2025 (i.e. with the state level 2-year data)
   nsduh_2016_2017_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2016_2017.csv")
   nsduh_2017_2018_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2017_2018.csv")
   nsduh_2018_2019_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2018_2019.csv")

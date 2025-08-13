@@ -21,7 +21,7 @@ library(spdep)
 load("WAprevalence/data/data_for_analysis.Rda")
 
 # IMPORT MCMC OUTPUT FROM MODEL
-load("WAprevalence/output/mcmc/MCMC_no_covariates.Rda")
+load("WAprevalence/output/mcmc/MCMC_no_covariates_2025_08_12.Rda")
 
 # IMPORT SHAPE FILES FOR WA COUNTIES
 load("WAprevalence/data/shape_county_WA.Rda")
@@ -38,7 +38,6 @@ MCMCvis::MCMCtrace(samples, params = paste0("u[", sample(1:234, 20), "]"), ISB =
 MCMCvis::MCMCtrace(samples, params = "beta", filename = "beta", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = "beta.mu", filename = "beta.mu", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = "mu", filename = "mu", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = "tau", filename = "tau", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = "tau.f", filename = "tau.f", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = "tau.u", filename = "tau.u", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 1]"), ISB = F, filename = "eps.pmp", "WAprevalence/output/diagnostics")
@@ -54,17 +53,17 @@ results <- list(colMeans(samples),
 
 # specify indices of parameters of interest
 pmp_lwr <- which(names(results[[1]])=="pi[1, 1]")
-pmp_upr <- which(names(results[[1]])=="pi[234, 1]")
+pmp_upr <- which(names(results[[1]])=="pi[273, 1]")
 death_lwr <- which(names(results[[1]])=="pi[1, 2]")
-death_upr <- which(names(results[[1]])=="pi[234, 2]")
+death_upr <- which(names(results[[1]])=="pi[273, 2]")
 N_lwr <- which(names(results[[1]]) == "N[1]")
-N_upr <- which(names(results[[1]]) == "N[234]")
+N_upr <- which(names(results[[1]]) == "N[273]")
 lambda_lwr <- which(names(results[[1]]) == "lambda[1]")
-lambda_upr <- which(names(results[[1]]) == "lambda[234]")
+lambda_upr <- which(names(results[[1]]) == "lambda[273]")
 beta_lwr <- which(names(results[[1]]) == "beta[1, 1]")
-beta_upr <- which(names(results[[1]]) == "beta[6, 2]")
+beta_upr <- which(names(results[[1]]) == "beta[7, 2]")
 mu_lwr <- which(names(results[[1]]) == "mu[1]")
-mu_upr <- which(names(results[[1]]) == "mu[6]")
+mu_upr <- which(names(results[[1]]) == "mu[7]")
 
 # create tidy data sets of estimates merged with corresponding spatio-temporal data
 results_to_tibble <- function(results, par) {
@@ -199,7 +198,7 @@ create_choropleth_map <- function(data, value, colorbar_type = NULL, colorbar_ti
         labs(fill = colorbar_title) +
         theme_map() +
         theme(legend.position = "right") +
-        facet_wrap(~year) +
+        facet_wrap(~year, nrow = 2, ncol = 4) +
         theme(strip.background = element_rect(fill = "white", color = NA),
               strip.text = element_text(color = "black",
                                         size = 12, 
@@ -297,9 +296,9 @@ post_outcome_prev <- list(colMeans(post_outcome_prev),
 tibble(pred_beta = post_outcome_prev[[1]],
        lwr95 = post_outcome_prev[[2]][1, ],
        upr95 = post_outcome_prev[[2]][2, ],
-       year = rep(2017:2022, 2),
+       year = rep(2017:2023, 2),
        outcome = rep(c("Buprenorphine prescription",
-                       "Death due to opioid misuse"), each = 6)
+                       "Death due to opioid misuse"), each = 7)
 ) %>%
   mutate(across(c(pred_beta, lwr95, upr95), log)) %>%
   ggplot(aes(x = year, y = pred_beta, fill = outcome)) +
@@ -337,12 +336,14 @@ pred_mu_aggr <- samples[,mu_lwr:mu_upr] %>%
                            `2018-2019`= (`mu[2]` + `mu[3]`)/2,
                            `2019-2020`= (`mu[3]` + `mu[4]`)/2,
                            `2020-2021`= (`mu[4]` + `mu[5]`)/2,
-                           `2021-2022`= (`mu[5]` + `mu[6]`)/2) %>%
+                           `2021-2022`= (`mu[5]` + `mu[6]`)/2,
+                           `2022-2023`= (`mu[6]` + `mu[7]`)/2) %>%
                     select(`2017-2018`,
                            `2018-2019`,
                            `2019-2020`,
                            `2020-2021`,
-                           `2021-2022`) %>%
+                           `2021-2022`,
+                           `2022-2023`) %>%
                     summarise_all(median) %>%
                     unlist()
 
@@ -352,12 +353,14 @@ CrI_aggr <- samples[,mu_lwr:mu_upr] %>%
                      `2018-2019`= (`mu[2]` + `mu[3]`)/2,
                      `2019-2020`= (`mu[3]` + `mu[4]`)/2,
                      `2020-2021`= (`mu[4]` + `mu[5]`)/2,
-                     `2021-2022`= (`mu[5]` + `mu[6]`)/2) %>%
+                     `2021-2022`= (`mu[5]` + `mu[6]`)/2,
+                     `2022-2023`= (`mu[6]` + `mu[7]`)/2) %>%
               select(`2017-2018`,
                      `2018-2019`,
                      `2019-2020`,
                      `2020-2021`,
-                     `2021-2022`) %>%
+                     `2021-2022`,
+                     `2022-2023`)  %>%
               summarise_all(quantile, probs = c(.025, .975))
 
 lwr95_aggr <- CrI_aggr %>% slice(1) %>% unlist()
@@ -366,7 +369,7 @@ upr95_aggr <- CrI_aggr %>% slice(2) %>% unlist()
 tibble(pred_mu_aggr = pred_mu_aggr,
        lwr95_aggr = lwr95_aggr,
        upr95_aggr = upr95_aggr,
-       year = 2017:2021
+       year = 2017:2022
 ) %>%
   ggplot() +
   geom_point(aes(x = year, y = S, color = "NSDUH Data"),
@@ -434,6 +437,7 @@ ggsave("2_yr_mu_trend.png",
   biscale_data_2020 <- biscale_data_year(2020)
   biscale_data_2021 <- biscale_data_year(2021)
   biscale_data_2022 <- biscale_data_year(2022)
+  biscale_data_2023 <- biscale_data_year(2023)
 
   # stack data
   biscale_data <- biscale_data_2017 %>%
@@ -441,7 +445,8 @@ ggsave("2_yr_mu_trend.png",
                               biscale_data_2019,
                               biscale_data_2020,
                               biscale_data_2021,
-                              biscale_data_2022)
+                              biscale_data_2022,
+                              biscale_data_2023)
 
   # create biscale plot
   biscale_legend <- bi_legend(pal = "GrPink",
@@ -517,6 +522,7 @@ ggsave("2_yr_mu_trend.png",
    crossCorrelation_2020 <- crossCorrelation_year(2020)
    crossCorrelation_2021 <- crossCorrelation_year(2021)
    crossCorrelation_2022 <- crossCorrelation_year(2022)
+   crossCorrelation_2023 <- crossCorrelation_year(2023)
  
   # extract clusters and put into data frame
    cluster_data <- function(data, year) {
@@ -546,6 +552,7 @@ ggsave("2_yr_mu_trend.png",
    cluster_data_2020 <- cluster_data(crossCorrelation_2020, 2020)
    cluster_data_2021 <- cluster_data(crossCorrelation_2021, 2021)
    cluster_data_2022 <- cluster_data(crossCorrelation_2022, 2022)
+   cluster_data_2023 <- cluster_data(crossCorrelation_2023, 2023)
    
    # stack data
    cluster_data <- cluster_data_2017 %>%
@@ -553,7 +560,8 @@ ggsave("2_yr_mu_trend.png",
                                 cluster_data_2019,
                                 cluster_data_2020,
                                 cluster_data_2021,
-                                cluster_data_2022)
+                                cluster_data_2022,
+                                cluster_data_2023)
    
    # create biscale plot using cluster from crossCorrelation
    cluster_legend <- bi_legend(pal = "GrPink",
@@ -569,7 +577,7 @@ ggsave("2_yr_mu_trend.png",
              size = 0.1, 
              show.legend = F) +
      bi_scale_fill(pal = "GrPink", dim = 2) +
-     facet_wrap(~year) +
+     facet_wrap(~year, nrow=2, ncol =4) +
      theme_map() +
      theme(strip.background = element_rect(fill = "white", color = NA),
            strip.text = element_text(color = "black",

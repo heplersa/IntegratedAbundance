@@ -132,7 +132,7 @@ model_code <- nimbleCode({
 
 # DEFINE NIMBLE CONSTANTS, DATA, and INITS
 n <- length(num) # number of WA counties
-T <- length(2017:2022) # number of years
+T <- length(2017:2023) # number of years
 K <-  dim(yfit[, c("pmp", "death")])[2] # number of outcomes
 
 mod_constants <- list(R = n,
