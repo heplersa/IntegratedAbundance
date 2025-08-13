@@ -462,7 +462,7 @@ ggsave("2_yr_mu_trend.png",
                             size = 0.1, 
                             show.legend = F) +
                       bi_scale_fill(pal = "GrPink", dim = 2) +
-                      facet_wrap(~year) +
+                      facet_wrap(~year, nrow = 2, ncol = 4) +
                       theme_map() +
                       theme(strip.background = element_rect(fill = "white", color = NA),
                             strip.text = element_text(color = "black",
