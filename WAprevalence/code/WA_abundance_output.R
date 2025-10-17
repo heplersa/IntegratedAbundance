@@ -170,7 +170,7 @@ create_choropleth_map <- function(data, value, colorbar_type = NULL, colorbar_ti
   p <- {if(colorbar_type == "monotonic"){
     
     p + scale_fill_gradient(low = "white",
-                            high = "red",
+                            high = "blue",
                             guide = guide_colorbar(barheight = 12))
     
   } else if(colorbar_type == "diverging") {
@@ -424,7 +424,7 @@ ggsave("2_yr_mu_trend.png",
             bi_class(x = prev_est, 
                      y = pmp_est,
                      style = "quantile",
-                     dim = 2)
+                     dim = 4)
     
     
     
@@ -449,8 +449,8 @@ ggsave("2_yr_mu_trend.png",
                               biscale_data_2023)
 
   # create biscale plot
-  biscale_legend <- bi_legend(pal = "GrPink",
-                              dim = 2,
+  biscale_legend <- bi_legend(pal = "GrPink2",
+                              dim = 4,
                               xlab = "Prevalence",
                               ylab = "Buprenorphine",
                               size = 5)
@@ -461,7 +461,7 @@ ggsave("2_yr_mu_trend.png",
                             color = "white",
                             size = 0.1, 
                             show.legend = F) +
-                      bi_scale_fill(pal = "GrPink", dim = 2) +
+                      bi_scale_fill(pal = "GrPink2", dim = 4) +
                       facet_wrap(~year, nrow = 2, ncol = 4) +
                       theme_map() +
                       theme(strip.background = element_rect(fill = "white", color = NA),
@@ -474,9 +474,10 @@ ggsave("2_yr_mu_trend.png",
    
    ggdraw() +
      draw_plot(biscale_map, 0, 0, 1, 1) +
-     draw_plot(biscale_legend, 0.4, .8, 0.2, 0.2) 
+     draw_plot(biscale_legend, 0.77, .26, 0.2, 0.2) 
+     #draw_plot(biscale_legend, 0.4, .8, 0.2, 0.2) 
    
-   ggsave("biplot_2dim.png",
+   ggsave("biplot_4dim_alt.png",
           device="png",
           path="WAprevalence/output/maps",
           width = 12,
