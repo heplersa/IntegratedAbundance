@@ -466,7 +466,7 @@ ggsave("2_yr_mu_trend.png",
                       theme_map() +
                       theme(strip.background = element_rect(fill = "white", color = NA),
                             strip.text = element_text(color = "black",
-                                                      size = 12, 
+                                                      size = 7.5, 
                                                       hjust = 0),
                             legend.text = element_text(size = 12),
                             legend.title = element_text(size = 12)
