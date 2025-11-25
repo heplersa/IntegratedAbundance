@@ -77,30 +77,11 @@ library(tidycensus) # pull pop data from US Census
   
   # import raw data
   
-    # original data 
-    #outcomes_raw <- read.csv("WAprevalence/data/outcomes/Single_year_crc_file.csv")
-    
     # summer 2025 update; expand study period to 2017-2023 (so add 2023)
     outcomes_raw <- read.csv("WAprevalence/data/outcomes/final_county_data_single_year_dedupe_with_unknowns.csv")
   
   # process raw data
-  
-    # extract pmp and death marginal counts from encoded 2x2 tables in raw data; combine with population data
-    #outcomes_processed <- outcomes_raw %>%
-    #                        filter(county != "UNKNOWN") %>%
-    #                        group_by(year, county, pmp, death) %>%
-    #                        summarise(oud_sum = sum(OUD)) %>%
-    #                        pivot_wider(names_from = c(pmp, death),
-    #                                    values_from = oud_sum) %>%
-    #                        mutate(across(c(`1_0`, `0_1`, `1_1`), function(x) if_else(is.na(x)==T, 0, x))) %>%
-    #                        rowwise() %>%
-    #                        mutate(pmp = sum(`1_0`,`1_1`, na.rm = T),
-    #                               death = sum(`0_1` + `1_1`, na.rm =T)
-    #                        ) %>%
-    #                        mutate(county = tolower(county)) %>%
-    #                        left_join(WA_county_pop_processed,
-    #                                  by = c("year", "county"))
-    
+
     # extract marginal county by year counts for pmp_oud and death_oud using latest data
     outcomes_processed <- outcomes_raw %>%
             filter(final_county != "Unknown") %>%
@@ -117,6 +98,14 @@ library(tidycensus) # pull pop data from US Census
   apply(outcomes_processed[, c("pmp", "death")], 2, function(x) sum(is.na(x))) == c(0, 0)
   # check that all counties-years are present; 6 years x 39 counties = 234 rows
   nrow(outcomes_processed) == 7*39
+  
+  # import any opioid overdose hospitalization and ED visit outcomes
+  any_opioid_overdose_ED <- read.csv("WAprevalence/data/outcomes/Overdose_Downloadable_ED.csv")
+  any_opioid_overdose_hospitalization <- read.csv("WAprevalence/data/outcomes/Overdose_Downloadable_Hospitalizations.csv")
+  
+  # clean these outcomes
+  
+  # combine with other outcomes
   
   # rename for use in Bayesian model
   yfit <- outcomes_processed
