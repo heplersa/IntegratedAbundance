@@ -16,12 +16,23 @@ model_code <- nimbleCode({
     
     for(i in 1:R){ # counties
       
-      for(j in 1:K){ # outcomes
+      for(j in 1:2){ # outcomes (each patient contributes only one count)
         
         y[(t-1)*R+i,j] ~ dbinom(pi[(t-1)*R+i,j], N[(t-1)*R+i])
         mu.f[(t-1)*R+i,j] <- 0
         
       }
+      
+      for(j in 3:4){ # outcomes (each patient can contribute more than one count)
+        
+        y[(t-1)*R+i,j] ~ dpois(pi[(t-1)*R+i,j]*N[(t-1)*R+i])
+        mu.f[(t-1)*R+i,j] <- 0
+        
+      }
+      
+      # poisson outcomes are censored in [1,9]
+      censored_ed[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,3], c_ed[(t-1)*R+i, 1:2])
+      censored_hosp[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,4], c_hosp[(t-1)*R+i, 1:2])
       
       # outcome error term
       eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], cov = cov.eps[1:K, 1:K])
@@ -29,6 +40,10 @@ model_code <- nimbleCode({
       # logistic link for binomial outcome(s)
       pi[(t-1)*R+i,1] <- ilogit(beta[t,1] + (f[(t-1)*R+i,1] + mu.f[(t-1)*R+i,1]) + eps[(t-1)*R+i,1])
       pi[(t-1)*R+i,2] <- ilogit(beta[t,2] + (f[(t-1)*R+i,2] + mu.f[(t-1)*R+i,2]) + eps[(t-1)*R+i,2])
+      
+      # log link for poisson outcome(s)
+      pi[(t-1)*R+i,3] <- exp(beta[t,3] + (f[(t-1)*R+i,3] + mu.f[(t-1)*R+i,3]) + eps[(t-1)*R+i,3])
+      pi[(t-1)*R+i,4] <- exp(beta[t,4] + (f[(t-1)*R+i,4] + mu.f[(t-1)*R+i,4]) + eps[(t-1)*R+i,4])
       
       # latent counts (process model)
       mu.u[(t-1)*R+i] <- 0
@@ -48,12 +63,23 @@ model_code <- nimbleCode({
     
     for(i in 1:R){ # counties
       
-      for(j in 1:K){ # outcomes
+      for(j in 1:2){ # outcomes (each patient contributes only one count)
         
         y[(t-1)*R+i,j] ~ dbinom(pi[(t-1)*R+i,j], N[(t-1)*R+i])
         mu.f[(t-1)*R+i,j] <- phi.f[j]*f[(t-2)*R+i, j]
         
       }
+      
+      for(j in 3:4){ # outcomes (each patient can contribute more than one count)
+        
+        y[(t-1)*R+i,j] ~ dpois(pi[(t-1)*R+i,j]*N[(t-1)*R+i])
+        mu.f[(t-1)*R+i,j] <- phi.f[j]*f[(t-2)*R+i, j]
+        
+      }
+      
+      # poisson outcomes are censored in [1,9]
+      censored_ed[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,3], c_ed[(t-1)*R+i, 1:2])
+      censored_hosp[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,4], c_hosp[(t-1)*R+i, 1:2])
       
       # outcome error term
       eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], cov = cov.eps[1:K, 1:K])
@@ -61,6 +87,10 @@ model_code <- nimbleCode({
       # logistic link for binomial outcome(s)
       pi[(t-1)*R+i,1] <- ilogit(beta[t,1] + (f[(t-1)*R+i,1] + mu.f[(t-1)*R+i,1]) + eps[(t-1)*R+i,1])
       pi[(t-1)*R+i,2] <- ilogit(beta[t,2] + (f[(t-1)*R+i,2] + mu.f[(t-1)*R+i,2]) + eps[(t-1)*R+i,2])
+      
+      # log link for poisson outcome(s)
+      pi[(t-1)*R+i,3] <- exp(beta[t,3] + (f[(t-1)*R+i,3] + mu.f[(t-1)*R+i,3]) + eps[(t-1)*R+i,3])
+      pi[(t-1)*R+i,4] <- exp(beta[t,4] + (f[(t-1)*R+i,4] + mu.f[(t-1)*R+i,4]) + eps[(t-1)*R+i,4])
 
       # latent counts (process model)
       mu.u[(t-1)*R+i] <- phi.u*u[(t-2)*R+i] 
@@ -133,7 +163,26 @@ model_code <- nimbleCode({
 # DEFINE NIMBLE CONSTANTS, DATA, and INITS
 n <- length(num) # number of WA counties
 T <- length(2017:2023) # number of years
-K <-  dim(yfit[, c("pmp", "death")])[2] # number of outcomes
+K <-  dim(yfit[, c("pmp", "death", "ed", "hosp")])[2] # number of outcomes
+
+# prepare constraint objects
+cens_index_ed <- which(is.na(yfit$ed))[-c(1:78)] # note that 2017, 2018 NA but not censored
+cens_index_hosp <- which(is.na(yfit$hosp))
+censored_ed <- rep(1, n*T)
+censored_hosp <- rep(1, n*T)
+yinit <- yfit[, c("pmp", "death", "ed", "hosp")]
+yinit[cens_index_ed, 3] <-  2
+yinit[cens_index_hosp, 4] <-  2
+c_ed <- matrix(0, nrow=n*T, ncol=2)
+c_hosp <- matrix(0, nrow=n*T, ncol=2)
+c_ed[cens_index_ed, 1] <- 0
+c_ed[cens_index_ed, 2] <- 9
+c_ed[-cens_index_ed, 1] <- -Inf
+c_ed[-cens_index_ed, 2] <- Inf
+c_hosp[cens_index_hosp, 1] <- 0
+c_hosp[cens_index_hosp, 2] <- 9
+c_hosp[-cens_index_hosp, 1] <- -Inf
+c_hosp[-cens_index_hosp, 2] <- Inf
 
 mod_constants <- list(R = n,
                       T = T,
@@ -147,10 +196,14 @@ mod_constants <- list(R = n,
                       mean.mu = rep(0, 2),
                       cov.mu = 10^4*diag(2),
                       mean.eps = rep(0, K),
-                      cov.eps.R = diag(K)
+                      cov.eps.R = diag(K),
+                      c_ed = c_ed,
+                      c_hosp = c_hosp
 )
 
-mod_data <- list(y=as.matrix(yfit[,c("pmp", "death")]),
+mod_data <- list(y=as.matrix(yfit[,c("pmp", "death", "ed", "hosp")]),
+                 censored_ed = censored_ed,
+                 censored_hosp = censored_hosp,
                  S=logit_S
 )
 
@@ -186,8 +239,25 @@ if(length(II) > 0){
   
 }
 
+II <- which(Ninit < yfit[,"ed"])
+
+if(length(II) > 0){
+  
+  Ninit[II] <- yfit[II,"ed"] + 100
+  
+}
+
+II <- which(Ninit < yfit[,"hosp"])
+
+if(length(II) > 0){
+  
+  Ninit[II] <- yfit[II,"hosp"] + 100
+  
+}
+
 # set initial values.
-mod_inits <- list(N = Ninit,
+mod_inits <- list(y = as.matrix(yinit),
+                  N = Ninit,
                   beta = beta.init,
                   cov.eps = diag(K),
                   tau.v = .1, 
@@ -208,7 +278,7 @@ nimble_model <- nimbleModel(model_code,
 compiled_model <- compileNimble(nimble_model,
                                 resetFunctions = TRUE)
 
-# Set up samplers.
+# set up samplers.
 mcmc_conf <- configureMCMC(nimble_model,
                            monitors=c('tau.u',
                                       'tau.f',
@@ -276,4 +346,4 @@ samples <- runMCMC(compiled_mcmc,
                    setSeed = 2) 
 
 Sys.time()-st
-save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_2025_08_12.Rda")
+save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_2025_12_13.Rda")
