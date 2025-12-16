@@ -29,7 +29,7 @@ load("WAprevalence/data/shape_county_WA.Rda")
 # EXAMINE MCMC CONVERGENCE
 MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:234, 20), ", 1]"), ISB = F, filename = "pmp", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:234, 20), ", 2]"), ISB = F, filename = "death", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:234, 20), ", 3]"), ISB = F, filename = "ed", wd = "WAprevalence/output/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(79:234, 20), ", 3]"), ISB = F, filename = "ed", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:234, 20), ", 4]"), ISB = F, filename = "hosp", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("N[", sample(1:234, 20), "]"), ISB = F, filename = "N", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("lambda[", sample(1:234, 20), "]"), ISB = F, filename = "lambda", wd = "WAprevalence/output/diagnostics")
@@ -37,21 +37,31 @@ MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:234, 20), ", 1]"), IS
 MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:234, 20), ", 2]"), ISB = F, filename = "f_death", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("v[", sample(1:234, 20), "]"), ISB = F, filename = "v", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("u[", sample(1:234, 20), "]"), ISB = F, filename = "u", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = "beta", filename = "beta", wd = "WAprevalence/output/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("beta[", 1:7, ", 1]"), ISB = F, filename = "beta_pmp", wd = "WAprevalence/output/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("beta[", 1:7, ", 2]"), ISB = F, filename = "beta_death", wd = "WAprevalence/output/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("beta[", 3:7, ", 3]"), ISB = F, filename = "beta_ed", wd = "WAprevalence/output/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("beta[", 1:7, ", 4]"), ISB = F, filename = "beta_hosp", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = "beta.mu", filename = "beta.mu", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = "mu", filename = "mu", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = "tau.f", filename = "tau.f", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = "tau.u", filename = "tau.u", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 1]"), ISB = F, filename = "eps.pmp", "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 2]"), ISB = F, filename = "eps.death", "WAprevalence/output/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 3]"), ISB = F, filename = "eps.ed", "WAprevalence/output/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 4]"), ISB = F, filename = "eps.hosp", "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = "cov.eps", filename = "cov.eps", wd = "WAprevalence/output/diagnostics")
 
 # EXTRACT POSTERIOR MEANS, 95% CrI (QUANTILES), SD AND NEW GR DIAGNOSTIC STAT
+
+# remove un-sampled MCMC parameters for ED outcome years 2017-2018 as these years missing for this outcome and thus not modeled; 39 counties x 2 years = 78
+samples[,  -c(which(colnames(samples)=="pi[1, 3]"):which(colnames(samples)=="pi[78, 3]"), 
+              which(colnames(samples)=="beta[1, 3]"):which(colnames(samples)=="beta[2, 3]"))]
+
 results <- list(colMeans(samples, na.rm = T),
-                apply(samples,2,
-                      quantile, probs=c(.025,.975), na.rm = T),
-                apply(samples,2, sd, na.rm = T)) #, 
-                apply(samples, 2, function(x) stable.GR(x, multivariate = F)$psrf))
+                  apply(samples,2,
+                        quantile, probs=c(.025,.975), na.rm = T),
+                  apply(samples,2, sd, na.rm = T), 
+                  apply(samples, 2, function(x) stable.GR(x, multivariate = F)$psrf))
 
 # specify indices of parameters of interest
 pmp_lwr <- which(names(results[[1]])=="pi[1, 1]")

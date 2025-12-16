@@ -133,19 +133,31 @@ model_code <- nimbleCode({
   }
   
   # spatial random effects for data level
-  for(j in 1:K){
-    
-    for(t in 1:T){
+  
+    # outcomes with data over whole study period
+    for(j in 1:K){
       
-      f[((t-1)*R+1):((t-1)*R+R), j] ~ dcar_normal(adj=adj[], 
-                                                  num=num[],
-                                                  tau=tau.f[j],
-                                                  zero_mean=1)
+      for(t in 1:T){
+        
+        f[((t-1)*R+1):((t-1)*R+R), j] ~ dcar_normal(adj=adj[], 
+                                                    num=num[],
+                                                    tau=tau.f[j],
+                                                    zero_mean=1)
+        
+      }
       
     }
-    
-  }
   
+    # outcome (ED visits) without data over whole study period
+    for(t in 3:T){
+        
+        f[((t-1)*R+1):((t-1)*R+R), 3] ~ dcar_normal(adj=adj[], 
+                                                    num=num[],
+                                                    tau=tau.f[3],
+                                                    zero_mean=1)
+        
+      }
+      
   # spatial random effect for process level
   for(t in 1:T){
     
@@ -157,14 +169,23 @@ model_code <- nimbleCode({
   }
   
   # time-varying intercepts for data level
-  for(j in 1:K){
-    
-    for(t in 1:T){
+  
+    # outcomes with data over whole study period
+    for(j in 1:K){
       
-      beta[t, j] ~ dflat() 
+      for(t in 1:T){
+        
+        beta[t, j] ~ dflat() 
+        
+      }
       
-    }
-    
+    # outcome (ED visits) without data over whole study period
+       for(t in 3:T){
+          
+          beta[t, 3] ~ dflat() 
+          
+        }
+      
     phi.f[j] ~ dunif(0,1) # auto-regressive parameters for spatial random effect in data level
     tau.f[j] ~ dgamma(.5,.5) # variance parameters for for spatial random effect in data level
     
@@ -351,7 +372,7 @@ compiled_mcmc <- compileNimble(nimble_mcmc, project = nimble_model, resetFunctio
 
 # Run the model 
 set.seed(2025)
-MCS <- 1*10^5
+MCS <- 1.5*10^6
 st  <- Sys.time()
 samples <- runMCMC(compiled_mcmc,
                    inits = mod_inits,
@@ -366,4 +387,4 @@ samples <- runMCMC(compiled_mcmc,
                    setSeed = 2) 
 
 Sys.time()-st
-save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_2025_12_13.Rda")
+save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_2025_12_15.Rda")
