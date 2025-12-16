@@ -21,7 +21,7 @@ library(spdep)
 load("WAprevalence/data/data_for_analysis.Rda")
 
 # IMPORT MCMC OUTPUT FROM MODEL
-load("WAprevalence/output/mcmc/MCMC_no_covariates_2025_08_12.Rda")
+load("WAprevalence/output/mcmc/MCMC_no_covariates_2025_12_13.Rda")
 
 # IMPORT SHAPE FILES FOR WA COUNTIES
 load("WAprevalence/data/shape_county_WA.Rda")
@@ -29,6 +29,8 @@ load("WAprevalence/data/shape_county_WA.Rda")
 # EXAMINE MCMC CONVERGENCE
 MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:234, 20), ", 1]"), ISB = F, filename = "pmp", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:234, 20), ", 2]"), ISB = F, filename = "death", wd = "WAprevalence/output/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:234, 20), ", 3]"), ISB = F, filename = "ed", wd = "WAprevalence/output/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:234, 20), ", 4]"), ISB = F, filename = "hosp", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("N[", sample(1:234, 20), "]"), ISB = F, filename = "N", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("lambda[", sample(1:234, 20), "]"), ISB = F, filename = "lambda", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:234, 20), ", 1]"), ISB = F, filename = "f_pmp", wd = "WAprevalence/output/diagnostics")
@@ -45,10 +47,10 @@ MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 2]"), 
 MCMCvis::MCMCtrace(samples, params = "cov.eps", filename = "cov.eps", wd = "WAprevalence/output/diagnostics")
 
 # EXTRACT POSTERIOR MEANS, 95% CrI (QUANTILES), SD AND NEW GR DIAGNOSTIC STAT
-results <- list(colMeans(samples),
+results <- list(colMeans(samples, na.rm = T),
                 apply(samples,2,
-                      quantile,probs=c(.025,.975)),
-                apply(samples,2,sd), 
+                      quantile, probs=c(.025,.975), na.rm = T),
+                apply(samples,2, sd, na.rm = T)) #, 
                 apply(samples, 2, function(x) stable.GR(x, multivariate = F)$psrf))
 
 # specify indices of parameters of interest
@@ -56,12 +58,16 @@ pmp_lwr <- which(names(results[[1]])=="pi[1, 1]")
 pmp_upr <- which(names(results[[1]])=="pi[273, 1]")
 death_lwr <- which(names(results[[1]])=="pi[1, 2]")
 death_upr <- which(names(results[[1]])=="pi[273, 2]")
+ed_lwr <- which(names(results[[1]])=="pi[1, 3]")
+ed_upr <- which(names(results[[1]])=="pi[273, 3]")
+hosp_lwr <- which(names(results[[1]])=="pi[1, 4]")
+hosp_upr <- which(names(results[[1]])=="pi[273, 4]")
 N_lwr <- which(names(results[[1]]) == "N[1]")
 N_upr <- which(names(results[[1]]) == "N[273]")
 lambda_lwr <- which(names(results[[1]]) == "lambda[1]")
 lambda_upr <- which(names(results[[1]]) == "lambda[273]")
 beta_lwr <- which(names(results[[1]]) == "beta[1, 1]")
-beta_upr <- which(names(results[[1]]) == "beta[7, 2]")
+beta_upr <- which(names(results[[1]]) == "beta[7, 4]")
 mu_lwr <- which(names(results[[1]]) == "mu[1]")
 mu_upr <- which(names(results[[1]]) == "mu[7]")
 
@@ -79,9 +85,11 @@ results_to_tibble <- function(results, par) {
          lwr95 = results[[2]][1, par_lwr:par_upr],
          upr95 = results[[2]][2, par_lwr:par_upr],
          sd = results[[3]][par_lwr:par_upr],
-         gr = results[[4]][par_lwr:par_upr],
+         #gr = results[[4]][par_lwr:par_upr],
          pmp_obs_rate = (yfit$pmp/pop),
-         death_obs_rate = (yfit$death/pop)
+         death_obs_rate = (yfit$death/pop),
+         ed_obs_rate = (yfit$ed/pop),
+         hosp_obs_rate = (yfit$hosp/pop)
          
   )
   
@@ -89,6 +97,9 @@ results_to_tibble <- function(results, par) {
 
 pmp_results <- results_to_tibble(results, "pmp")
 death_results <- results_to_tibble(results, "death")
+ed_results <- results_to_tibble(results, "ed") # %>% mutate(across(c(mean, lwr95, upr95), function(x) case_when(year %in% 2017:2018 ~ NA,                                                                                                          .default = x)))
+hosp_results <- results_to_tibble(results, "hosp")
+
 lambda_results <- results_to_tibble(results, "lambda") %>% 
                     mutate(CrI = case_when(
                                           lwr95 > 1  ~ "95% CrI > 1",
@@ -116,6 +127,20 @@ death_results_csv <-  death_results %>%
                                lwr95,
                                upr95)
 
+ed_results_csv <-  ed_results %>%
+  select(county,
+         year,
+         mean,
+         lwr95,
+         upr95)
+
+hosp_results_csv <-  hosp_results %>%
+  select(county,
+         year,
+         mean,
+         lwr95,
+         upr95)
+
 N_results_csv <-  N_results %>%
                     select(county,
                            year,
@@ -136,6 +161,14 @@ write.csv(pmp_results_csv,
 
 write.csv(death_results_csv,
           file = "WAprevalence/output/tables/death_results.csv",
+          row.names = F)
+
+write.csv(ed_results_csv,
+          file = "WAprevalence/output/tables/ed_results.csv",
+          row.names = F)
+
+write.csv(hosp_results_csv,
+          file = "WAprevalence/output/tables/hosp_results.csv",
           row.names = F)
 
 write.csv(N_results_csv,
@@ -170,7 +203,7 @@ create_choropleth_map <- function(data, value, colorbar_type = NULL, colorbar_ti
   p <- {if(colorbar_type == "monotonic"){
     
     p + scale_fill_gradient(low = "white",
-                            high = "blue",
+                            high = "red",
                             guide = guide_colorbar(barheight = 12))
     
   } else if(colorbar_type == "diverging") {
@@ -214,10 +247,14 @@ create_choropleth_map <- function(data, value, colorbar_type = NULL, colorbar_ti
   # observed maps
   pmp_obs_rate_map <-  create_choropleth_map(data = pmp_results, value = pmp_obs_rate, colorbar_type = "monotonic")
   death_obs_rate_map <-  create_choropleth_map(data = death_results, value = death_obs_rate, colorbar_type = "monotonic")
+  ed_obs_rate_map <-  create_choropleth_map(data = ed_results, value = ed_obs_rate, colorbar_type = "monotonic")
+  hosp_obs_rate_map <-  create_choropleth_map(data = hosp_results, value = hosp_obs_rate, colorbar_type = "monotonic")
   
   # model maps
   pmp_map <- create_choropleth_map(data = pmp_results, value = mean, colorbar_type = "monotonic")
   death_map <- create_choropleth_map(data = death_results, value = mean, colorbar_type = "monotonic")
+  ed_map <- create_choropleth_map(data = ed_results, value = mean, colorbar_type = "monotonic")
+  hosp_map <- create_choropleth_map(data = hosp_results, value = mean, colorbar_type = "monotonic")
   lambda_map <- create_choropleth_map(data = lambda_results, value = mean, colorbar_type = "diverging")
   lambda_CrI_map <- create_choropleth_map(data = lambda_results, value = CrI, colorbar_type = "other") + theme(legend.position = "right")
   N_map <- create_choropleth_map(data = N_results, value = mean_prev, colorbar_type = "monotonic")
@@ -238,6 +275,22 @@ ggsave(filename = "death_obs_rate.png",
        height = 3,
        width = 10) 
 
+ggsave(filename = "ed_obs_rate.png", 
+       plot = ed_obs_rate_map, 
+       path = "WAprevalence/output/maps", 
+       bg = "White",
+       dpi = "retina",
+       height = 3,
+       width = 10) 
+
+ggsave(filename = "hosp_obs_rate.png", 
+       plot = hosp_obs_rate_map, 
+       path = "WAprevalence/output/maps", 
+       bg = "White",
+       dpi = "retina",
+       height = 3,
+       width = 10) 
+
 ggsave(filename = "pmp.png", 
        plot = pmp_map, 
        path = "WAprevalence/output/maps", 
@@ -246,8 +299,24 @@ ggsave(filename = "pmp.png",
        height = 3,
        width = 10)
 
-ggsave(filename = "death.png", 
+ggsave(filename = "death2.png", 
        plot = death_map, 
+       path = "WAprevalence/output/maps", 
+       bg = "White",
+       dpi = "retina",
+       height = 3,
+       width = 10)
+
+ggsave(filename = "ed.png", 
+       plot = ed_map, 
+       path = "WAprevalence/output/maps", 
+       bg = "White",
+       dpi = "retina",
+       height = 3,
+       width = 10)
+
+ggsave(filename = "hosp.png", 
+       plot = hosp_map, 
        path = "WAprevalence/output/maps", 
        bg = "White",
        dpi = "retina",
@@ -289,6 +358,11 @@ post_outcome_prev <- list(colMeans(post_outcome_prev),
                                 quantile,probs=c(.025,.975)
                                 )
                      )
+
+# remove missing years for ED outcome
+post_outcome_prev[[1]][15:16] <- NA 
+post_outcome_prev[[2]][1, 15:16] <- NA
+post_outcome_prev[[2]][2, 15:16] <- NA 
      
 # no covariates in the model, so this shows the estimated state-wide prevalence
 # of each outcome among PWMO on the log scale
@@ -296,9 +370,11 @@ post_outcome_prev <- list(colMeans(post_outcome_prev),
 tibble(pred_beta = post_outcome_prev[[1]],
        lwr95 = post_outcome_prev[[2]][1, ],
        upr95 = post_outcome_prev[[2]][2, ],
-       year = rep(2017:2023, 2),
+       year = rep(2017:2023, 4),
        outcome = rep(c("Buprenorphine prescription",
-                       "Death due to opioid misuse"), each = 7)
+                       "Death due to opioid misuse",
+                       "ED visit due to opioid misuse",
+                       "Hospitalization due to opioid misue"), each = 7)
 ) %>%
   mutate(across(c(pred_beta, lwr95, upr95), log)) %>%
   ggplot(aes(x = year, y = pred_beta, fill = outcome)) +
@@ -477,7 +553,7 @@ ggsave("2_yr_mu_trend.png",
      draw_plot(biscale_legend, 0.77, .26, 0.2, 0.2) 
      #draw_plot(biscale_legend, 0.4, .8, 0.2, 0.2) 
    
-   ggsave("biplot_4dim_alt.png",
+   ggsave("biplot_4dim.png",
           device="png",
           path="WAprevalence/output/maps",
           width = 12,

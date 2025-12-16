@@ -23,16 +23,19 @@ model_code <- nimbleCode({
         
       }
       
-      for(j in 3:4){ # outcomes (each patient can contribute more than one count)
-        
-        y[(t-1)*R+i,j] ~ dpois(pi[(t-1)*R+i,j]*N[(t-1)*R+i])
-        mu.f[(t-1)*R+i,j] <- 0
-        
-      }
+      # outcomes (each patient can contribute more than one count)
       
-      # poisson outcomes are censored in [1,9]
-      censored_ed[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,3], c_ed[(t-1)*R+i, 1:2])
-      censored_hosp[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,4], c_hosp[(t-1)*R+i, 1:2])
+        # shift baseline time to be 2019 for ED visit outcome as no data available for 2017-2018
+        y[(t-1+2)*R+i,3] ~ dpois(pi[(t-1+2)*R+i,3]*N[(t-1+2)*R+i])
+        mu.f[(t-1+2)*R+i,3] <- 0
+          
+        # hospitalization outcome has data for all years so no need to shift time-index
+        y[(t-1)*R+i,4] ~ dpois(pi[(t-1)*R+i,4]*N[(t-1)*R+i])
+        mu.f[(t-1)*R+i,4] <- 0
+        
+        # poisson outcomes are censored in [1,9]
+        censored_ed[(t-1+2)*R+i] ~ dinterval(y[(t-1+2)*R+i,3], c_ed[(t-1+2)*R+i, 1:2])
+        censored_hosp[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,4], c_hosp[(t-1)*R+i, 1:2])
       
       # outcome error term
       eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], cov = cov.eps[1:K, 1:K])
@@ -42,7 +45,7 @@ model_code <- nimbleCode({
       pi[(t-1)*R+i,2] <- ilogit(beta[t,2] + (f[(t-1)*R+i,2] + mu.f[(t-1)*R+i,2]) + eps[(t-1)*R+i,2])
       
       # log link for poisson outcome(s)
-      pi[(t-1)*R+i,3] <- exp(beta[t,3] + (f[(t-1)*R+i,3] + mu.f[(t-1)*R+i,3]) + eps[(t-1)*R+i,3])
+      pi[(t-1+2)*R+i,3] <- exp(beta[t+2,3] + (f[(t-1+2)*R+i,3] + mu.f[(t-1+2)*R+i,3]) + eps[(t-1+2)*R+i,3])
       pi[(t-1)*R+i,4] <- exp(beta[t,4] + (f[(t-1)*R+i,4] + mu.f[(t-1)*R+i,4]) + eps[(t-1)*R+i,4])
       
       # latent counts (process model)
@@ -59,7 +62,7 @@ model_code <- nimbleCode({
     
   }
   
-  for(t in 2:T){ # remaining years
+  for(t in 2:T){ # remaining years (for outcomes with data available over whole study period)
     
     for(i in 1:R){ # counties
       
@@ -70,16 +73,14 @@ model_code <- nimbleCode({
         
       }
       
-      for(j in 3:4){ # outcomes (each patient can contribute more than one count)
+      # outcomes (each patient can contribute more than one count)
         
-        y[(t-1)*R+i,j] ~ dpois(pi[(t-1)*R+i,j]*N[(t-1)*R+i])
-        mu.f[(t-1)*R+i,j] <- phi.f[j]*f[(t-2)*R+i, j]
+        # hospitalization outcome has data for all years so no need to shift time-index
+        y[(t-1)*R+i,4] ~ dpois(pi[(t-1)*R+i,4]*N[(t-1)*R+i])
+        mu.f[(t-1)*R+i,4] <- phi.f[4]*f[(t-2)*R+i, 4]
         
-      }
-      
-      # poisson outcomes are censored in [1,9]
-      censored_ed[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,3], c_ed[(t-1)*R+i, 1:2])
-      censored_hosp[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,4], c_hosp[(t-1)*R+i, 1:2])
+        # poisson outcomes are censored in [1,9]
+        censored_hosp[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,4], c_hosp[(t-1)*R+i, 1:2])
       
       # outcome error term
       eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], cov = cov.eps[1:K, 1:K])
@@ -89,7 +90,6 @@ model_code <- nimbleCode({
       pi[(t-1)*R+i,2] <- ilogit(beta[t,2] + (f[(t-1)*R+i,2] + mu.f[(t-1)*R+i,2]) + eps[(t-1)*R+i,2])
       
       # log link for poisson outcome(s)
-      pi[(t-1)*R+i,3] <- exp(beta[t,3] + (f[(t-1)*R+i,3] + mu.f[(t-1)*R+i,3]) + eps[(t-1)*R+i,3])
       pi[(t-1)*R+i,4] <- exp(beta[t,4] + (f[(t-1)*R+i,4] + mu.f[(t-1)*R+i,4]) + eps[(t-1)*R+i,4])
 
       # latent counts (process model)
@@ -102,6 +102,26 @@ model_code <- nimbleCode({
     
     # mean state-wide risk of misuse in year t
     mu[t] <- ilogit(beta.mu[1] + beta.mu[2]*t)
+    
+  }
+  
+  for(t in 2:(T-2)){ # remaining years (for outcomes with data missing for 2018-2019)
+    
+    for(i in 1:R){ # counties
+      
+      # outcomes (each patient can contribute more than one count)
+      
+      # shift baseline time to be 2019 for ED visit outcome as no data available for 2017-2018
+      y[(t-1+2)*R+i,3] ~ dpois(pi[(t-1+2)*R+i,3]*N[(t-1+2)*R+i])
+      mu.f[(t-1+2)*R+i, 3] <- phi.f[3]*f[(t-2+2)*R+i, 3]
+      
+      # poisson outcomes are censored in [1,9]
+      censored_ed[(t-1+2)*R+i] ~ dinterval(y[(t-1+2)*R+i,3], c_ed[(t-1+2)*R+i, 1:2])
+      
+      # log link for poisson outcome(s)
+      pi[(t-1+2)*R+i,3] <- exp(beta[t+2,3] + (f[(t-1+2)*R+i,3] + mu.f[(t-1+2)*R+i,3]) + eps[(t-1+2)*R+i,3])
+      
+    }
     
   }
   
@@ -331,7 +351,7 @@ compiled_mcmc <- compileNimble(nimble_mcmc, project = nimble_model, resetFunctio
 
 # Run the model 
 set.seed(2025)
-MCS <- 1*10^6
+MCS <- 1*10^5
 st  <- Sys.time()
 samples <- runMCMC(compiled_mcmc,
                    inits = mod_inits,
