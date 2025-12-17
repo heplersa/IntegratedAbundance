@@ -135,7 +135,7 @@ model_code <- nimbleCode({
   # spatial random effects for data level
   
     # outcomes with data over whole study period
-    for(j in 1:K){
+    for(j in c(1,2,4)){
       
       for(t in 1:T){
         
@@ -171,7 +171,7 @@ model_code <- nimbleCode({
   # time-varying intercepts for data level
   
     # outcomes with data over whole study period
-    for(j in 1:K){
+    for(j in c(1,2,4)){
       
       for(t in 1:T){
         
@@ -179,13 +179,17 @@ model_code <- nimbleCode({
         
       }
       
+    }
+      
     # outcome (ED visits) without data over whole study period
        for(t in 3:T){
           
           beta[t, 3] ~ dflat() 
           
         }
-      
+  
+  for(j in 1:K){
+    
     phi.f[j] ~ dunif(0,1) # auto-regressive parameters for spatial random effect in data level
     tau.f[j] ~ dgamma(.5,.5) # variance parameters for for spatial random effect in data level
     
@@ -372,7 +376,7 @@ compiled_mcmc <- compileNimble(nimble_mcmc, project = nimble_model, resetFunctio
 
 # Run the model 
 set.seed(2025)
-MCS <- 1.5*10^6
+MCS <- 1*10^6
 st  <- Sys.time()
 samples <- runMCMC(compiled_mcmc,
                    inits = mod_inits,
@@ -387,4 +391,4 @@ samples <- runMCMC(compiled_mcmc,
                    setSeed = 2) 
 
 Sys.time()-st
-save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_2025_12_15.Rda")
+save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_2025_12_16.Rda")

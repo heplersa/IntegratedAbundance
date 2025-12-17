@@ -21,7 +21,7 @@ library(spdep)
 load("WAprevalence/data/data_for_analysis.Rda")
 
 # IMPORT MCMC OUTPUT FROM MODEL
-load("WAprevalence/output/mcmc/MCMC_no_covariates_2025_12_13.Rda")
+load("WAprevalence/output/mcmc/MCMC_no_covariates_2025_12_16.Rda")
 
 # IMPORT SHAPE FILES FOR WA COUNTIES
 load("WAprevalence/data/shape_county_WA.Rda")
@@ -35,6 +35,8 @@ MCMCvis::MCMCtrace(samples, params = paste0("N[", sample(1:234, 20), "]"), ISB =
 MCMCvis::MCMCtrace(samples, params = paste0("lambda[", sample(1:234, 20), "]"), ISB = F, filename = "lambda", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:234, 20), ", 1]"), ISB = F, filename = "f_pmp", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:234, 20), ", 2]"), ISB = F, filename = "f_death", wd = "WAprevalence/output/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(79:234, 20), ", 3]"), ISB = F, filename = "f_ed", wd = "WAprevalence/output/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:234, 20), ", 4]"), ISB = F, filename = "f_hosp", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("v[", sample(1:234, 20), "]"), ISB = F, filename = "v", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("u[", sample(1:234, 20), "]"), ISB = F, filename = "u", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("beta[", 1:7, ", 1]"), ISB = F, filename = "beta_pmp", wd = "WAprevalence/output/diagnostics")
@@ -45,22 +47,23 @@ MCMCvis::MCMCtrace(samples, params = "beta.mu", filename = "beta.mu", wd = "WApr
 MCMCvis::MCMCtrace(samples, params = "mu", filename = "mu", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = "tau.f", filename = "tau.f", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = "tau.u", filename = "tau.u", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 1]"), ISB = F, filename = "eps.pmp", "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 2]"), ISB = F, filename = "eps.death", "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 3]"), ISB = F, filename = "eps.ed", "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 4]"), ISB = F, filename = "eps.hosp", "WAprevalence/output/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 1]"), ISB = F, filename = "eps_pmp", wd = "WAprevalence/output/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 2]"), ISB = F, filename = "eps_death", wd = "WAprevalence/output/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 3]"), ISB = F, filename = "eps_ed", wd = "WAprevalence/output/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 4]"), ISB = F, filename = "eps_hosp", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = "cov.eps", filename = "cov.eps", wd = "WAprevalence/output/diagnostics")
 
 # EXTRACT POSTERIOR MEANS, 95% CrI (QUANTILES), SD AND NEW GR DIAGNOSTIC STAT
 
 # remove un-sampled MCMC parameters for ED outcome years 2017-2018 as these years missing for this outcome and thus not modeled; 39 counties x 2 years = 78
-samples[,  -c(which(colnames(samples)=="pi[1, 3]"):which(colnames(samples)=="pi[78, 3]"), 
-              which(colnames(samples)=="beta[1, 3]"):which(colnames(samples)=="beta[2, 3]"))]
+samples <- samples[,   -c(which(colnames(samples)=="pi[1, 3]"):which(colnames(samples)=="pi[78, 3]"), 
+                         which(colnames(samples)=="beta[1, 3]"):which(colnames(samples)=="beta[2, 3]"),
+                         which(colnames(samples)=="f[1, 3]"):which(colnames(samples)=="f[78, 3]"))]
 
 results <- list(colMeans(samples, na.rm = T),
-                  apply(samples,2,
+                  apply(samples, 2,
                         quantile, probs=c(.025,.975), na.rm = T),
-                  apply(samples,2, sd, na.rm = T), 
+                  apply(samples, 2, sd, na.rm = T), 
                   apply(samples, 2, function(x) stable.GR(x, multivariate = F)$psrf))
 
 # specify indices of parameters of interest
@@ -95,7 +98,7 @@ results_to_tibble <- function(results, par) {
          lwr95 = results[[2]][1, par_lwr:par_upr],
          upr95 = results[[2]][2, par_lwr:par_upr],
          sd = results[[3]][par_lwr:par_upr],
-         #gr = results[[4]][par_lwr:par_upr],
+         gr = results[[4]][par_lwr:par_upr],
          pmp_obs_rate = (yfit$pmp/pop),
          death_obs_rate = (yfit$death/pop),
          ed_obs_rate = (yfit$ed/pop),
@@ -107,7 +110,7 @@ results_to_tibble <- function(results, par) {
 
 pmp_results <- results_to_tibble(results, "pmp")
 death_results <- results_to_tibble(results, "death")
-ed_results <- results_to_tibble(results, "ed") # %>% mutate(across(c(mean, lwr95, upr95), function(x) case_when(year %in% 2017:2018 ~ NA,                                                                                                          .default = x)))
+ed_results <- results_to_tibble(results, "ed")  %>% mutate(across(c(mean, lwr95, upr95), function(x) case_when(year %in% 2017:2018 ~ NA,                                                                                                          .default = x)))
 hosp_results <- results_to_tibble(results, "hosp")
 
 lambda_results <- results_to_tibble(results, "lambda") %>% 
@@ -309,7 +312,7 @@ ggsave(filename = "pmp.png",
        height = 3,
        width = 10)
 
-ggsave(filename = "death2.png", 
+ggsave(filename = "death.png", 
        plot = death_map, 
        path = "WAprevalence/output/maps", 
        bg = "White",
