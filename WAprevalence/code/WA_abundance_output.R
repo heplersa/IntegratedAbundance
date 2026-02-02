@@ -395,7 +395,7 @@ ggsave(filename = "N.png",
   
   # specify outcomes name and size
   outcomes <- c("ED visit due to opioid misuse",
-                "Hospitalization due to opioid misue",
+                "Hospitalization due to opioid misuse",
                 "Buprenorphine prescription",
                 "Death due to opioid misuse"
   )
