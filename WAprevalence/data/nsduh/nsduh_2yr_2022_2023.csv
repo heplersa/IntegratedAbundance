@@ -1,0 +1,7 @@
+﻿"STATE FIPS CODE (NUMERIC)","RC-OPIOIDS - PAST YEAR MISUSE","Total %","Total % SE","Total % CI (lower)","Total % CI (upper)","Row %","Row % SE","Row % CI (lower)","Row % CI (upper)","Column %","Column % SE","Column % CI (lower)","Column % CI (upper)","Weighted Count","Count","Count SE"
+"Overall","Overall","1","0","N/A","N/A","1","0","N/A","N/A","1","0","N/A","N/A","6628000","N/A","334000"
+"53 - Washington","Overall","1","0","N/A","N/A","1","0","N/A","N/A","1","0","N/A","N/A","6628000","N/A","334000"
+"Overall","0 - Did not misuse in the past year","0.975","0.0043","0.965","0.982","0.975","0.0043","0.965","0.982","1","0","N/A","N/A","6462000","N/A","323000"
+"53 - Washington","0 - Did not misuse in the past year","0.975","0.0043","0.965","0.982","0.975","0.0043","0.965","0.982","1","0","N/A","N/A","6462000","N/A","323000"
+"Overall","1 - Misused in the past year","0.025","0.0043","0.018","0.035","0.025","0.0043","0.018","0.035","1","0","N/A","N/A","165000","N/A","31000"
+"53 - Washington","1 - Misused in the past year","0.025","0.0043","0.018","0.035","0.025","0.0043","0.018","0.035","1","0","N/A","N/A","165000","N/A","31000"
