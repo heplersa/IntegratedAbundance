@@ -16,6 +16,7 @@ library(biscale) # create biscale plots
 library(cowplot) # draw_plot
 library(spatialEco) # crossCorrelation
 library(spdep)
+library(readxl)
 
 # IMPORT PRE-PROCESSED DATA USED TO FIT MODEL. 
 load("WAprevalence/data/data_for_analysis.Rda")
@@ -56,10 +57,6 @@ MCMCvis::MCMCtrace(samples, params = "cov.eps", filename = "cov.eps", wd = "WApr
 # EXTRACT POSTERIOR MEANS, 95% CrI (QUANTILES), SD AND NEW GR DIAGNOSTIC STAT
 
 # remove un-sampled MCMC parameters for ED outcome years 2017-2018 as these years missing for this outcome and thus not modeled; 39 counties x 2 years = 78
-samples <- samples[,   -c(which(colnames(samples)=="pi[1, 3]"):which(colnames(samples)=="pi[78, 3]"), 
-                         which(colnames(samples)=="beta[1, 3]"):which(colnames(samples)=="beta[2, 3]"),
-                         which(colnames(samples)=="f[1, 3]"):which(colnames(samples)=="f[78, 3]"))]
-
 results <- list(colMeans(samples, na.rm = T),
                   apply(samples, 2,
                         quantile, probs=c(.025,.975), na.rm = T),
@@ -110,7 +107,7 @@ results_to_tibble <- function(results, par) {
 
 pmp_results <- results_to_tibble(results, "pmp")
 death_results <- results_to_tibble(results, "death")
-ed_results <- results_to_tibble(results, "ed")  %>% mutate(across(c(mean, lwr95, upr95), function(x) case_when(year %in% 2017:2018 ~ NA,                                                                                                          .default = x)))
+ed_results <- results_to_tibble(results, "ed") %>% mutate(across(c("mean", "lwr95", "upr95", "gr"),  function(x) case_when(year %in% 2017:2018 ~ NA, .default = x)))
 hosp_results <- results_to_tibble(results, "hosp")
 
 lambda_results <- results_to_tibble(results, "lambda") %>% 
@@ -120,6 +117,7 @@ lambda_results <- results_to_tibble(results, "lambda") %>%
                                           .default = "95% CrI contains 1"),
                            CrI = fct_relevel(CrI, c("95% CrI < 1", "95% CrI contains 1", "95% CrI > 1"))
                            )
+
 N_results <- results_to_tibble(results, "N") %>% 
                 mutate(mean_prev = mean/pop,
                        lwr95_prev = lwr95/pop,
@@ -362,129 +360,155 @@ ggsave(filename = "N.png",
 
 # EXAMINE ESTIMATED TIME-VARYING INTERCEPTS FOR EACH OUTCOME
 
-# compute posterior distribution of statewide outcome prevalence
-post_outcome_prev <- apply(samples[, beta_lwr:beta_upr], 2, ilogit)
-
-# compute posterior statistics of interest: mean, 95% CrI
-post_outcome_prev <- list(colMeans(post_outcome_prev),
-                          apply(post_outcome_prev,2,
-                                quantile,probs=c(.025,.975)
-                                )
-                     )
-
-# remove missing years for ED outcome
-post_outcome_prev[[1]][15:16] <- NA 
-post_outcome_prev[[2]][1, 15:16] <- NA
-post_outcome_prev[[2]][2, 15:16] <- NA 
-     
-# no covariates in the model, so this shows the estimated state-wide prevalence
-# of each outcome among PWMO on the log scale
-# y-axis ticks mapped to underlying prevalence value
-tibble(pred_beta = post_outcome_prev[[1]],
-       lwr95 = post_outcome_prev[[2]][1, ],
-       upr95 = post_outcome_prev[[2]][2, ],
-       year = rep(2017:2023, 4),
-       outcome = rep(c("Buprenorphine prescription",
-                       "Death due to opioid misuse",
-                       "ED visit due to opioid misuse",
-                       "Hospitalization due to opioid misue"), each = 7)
-) %>%
-  mutate(across(c(pred_beta, lwr95, upr95), log)) %>%
-  ggplot(aes(x = year, y = pred_beta, fill = outcome)) +
-  geom_point(aes(color = outcome)) +
-  geom_errorbar(aes(ymin = lwr95, ymax = upr95, color = outcome),
-                width = 0.05) +
-  geom_line(linetype = "dashed", aes(color = outcome)) +
-  geom_ribbon(aes(ymin = lwr95, ymax = upr95), alpha = 0.1) +
-  scale_y_continuous(
-                     breaks = c(-10:0),
-                     labels = round(c(0, exp(-9:0)), 3)
-                    # sec.axis = sec_axis(trans=~.*1, 
-                    #                     name="",
-                    #                     breaks = c(-6:0), 
-                    #                     labels = round(c(exp(-6), exp(-5), exp(-4), exp(-3), exp(-2), exp(-1), exp(0)), 2))
-  ) +
-  theme_classic() +
-  labs(color = "Outcome",
-       fill = "Outcome",
-       x = "Year",
-       y = "Estimated prevalence")
-
-ggsave(filename = "beta_log.png",
-       path = "WAprevalence/output",
-       dpi = "retina",
-       width = 13,
-       height = 10,
-       units = "cm"
-)
+  # compute posterior distribution of statewide outcome prevalence
+  
+    # binomial outcomes
+    post_binom_outcome_prev <- apply(samples[, beta_lwr:(beta_lwr+13)], 2, ilogit)
+  
+    # poisson outcomes
+    post_pois_outcome_prev <- apply(samples[, (beta_lwr+14):(beta_upr)], 2, exp)
+    
+  # compute posterior statistics of interest: mean, 95% CrI
+    
+    # binomial outcomes 
+    post_binom_outcome_prev <- list(colMeans(post_binom_outcome_prev),
+                                    apply(post_binom_outcome_prev,2,
+                                          quantile,probs=c(.025,.975)
+                                          )
+                         )
+    
+    # poisson outcomes
+    post_pois_outcome_prev <- list(colMeans(post_pois_outcome_prev),
+                                    apply(post_pois_outcome_prev,2,
+                                          quantile,probs=c(.025,.975)
+                                    )
+    )
+  
+  # remove missing years for ED outcome
+  post_pois_outcome_prev[[1]][1:2] <- NA 
+  post_pois_outcome_prev[[2]][1, 1:2] <- NA
+  post_pois_outcome_prev[[2]][2, 1:2] <- NA 
+  
+  # re-combine posterior means and credible intervals
+  post_outcome_prev <- list(c(post_pois_outcome_prev[[1]], post_binom_outcome_prev[[1]]),
+                            cbind(post_pois_outcome_prev[[2]], post_binom_outcome_prev[[2]]))
+  
+  # specify outcomes name and size
+  outcomes <- c("ED visit due to opioid misuse",
+                "Hospitalization due to opioid misuse",
+                "Buprenorphine prescription",
+                "Death due to opioid misuse"
+  )
+  
+  K <- length(outcomes)
+       
+  # estimated prevalence among PWMO (binomial outcomes) & rate per-person among PWMO (poisson)
+  # y-axis ticks mapped ot underlying prevalence or rate value
+  tibble(pred_beta = post_outcome_prev[[1]],
+           lwr95 = post_outcome_prev[[2]][1, ],
+           upr95 = post_outcome_prev[[2]][2, ],
+           year = rep(2017:2023, K),
+           outcome = rep(outcomes, each = 7)
+    ) %>%
+      mutate(across(c(pred_beta, lwr95, upr95), log)) %>%
+      ggplot(aes(x = year, y = pred_beta, fill = outcome)) +
+      geom_point(aes(color = outcome)) +
+      geom_errorbar(aes(ymin = lwr95, ymax = upr95, color = outcome),
+                    width = 0.05) +
+      geom_line(linetype = "dashed", aes(color = outcome)) +
+      geom_ribbon(aes(ymin = lwr95, ymax = upr95), alpha = 0.1) +
+      scale_y_continuous(
+                         breaks = c(-10:0),
+                         labels = round(c(0, exp(-9:0)), 3)
+                        # sec.axis = sec_axis(trans=~.*1, 
+                        #                     name="",
+                        #                     breaks = c(-6:0), 
+                        #                     labels = round(c(exp(-6), exp(-5), exp(-4), exp(-3), exp(-2), exp(-1), exp(0)), 2))
+      ) +
+      theme_classic() +
+      labs(color = "Outcome",
+           fill = "Outcome",
+           x = "Year",
+           y = "Estimated prevalence")
+  
+  ggsave(filename = "beta_log.png",
+         path = "WAprevalence/output",
+         dpi = "retina",
+         width = 13,
+         height = 10,
+         units = "cm"
+  )
 
 # EXAMINE ESTIMATED MULTI-YEAR AVERAGE STATE-WIDE RATE OF PWMO VS DATA
-pred_mu_aggr <- samples[,mu_lwr:mu_upr] %>%
-                    as_tibble() %>%
-                    mutate(`2017-2018`= (`mu[1]` + `mu[2]`)/2,
-                           `2018-2019`= (`mu[2]` + `mu[3]`)/2,
-                           `2019-2020`= (`mu[3]` + `mu[4]`)/2,
-                           `2020-2021`= (`mu[4]` + `mu[5]`)/2,
-                           `2021-2022`= (`mu[5]` + `mu[6]`)/2,
-                           `2022-2023`= (`mu[6]` + `mu[7]`)/2) %>%
-                    select(`2017-2018`,
-                           `2018-2019`,
-                           `2019-2020`,
-                           `2020-2021`,
-                           `2021-2022`,
-                           `2022-2023`) %>%
-                    summarise_all(median) %>%
-                    unlist()
+  
+  # compute posterior median and 95% CrI for 2-year state-wide rate of PWMO
+  pred_mu_aggr <- samples[,mu_lwr:mu_upr] %>%
+                      as_tibble() %>%
+                      mutate(`2017-2018`= (`mu[1]` + `mu[2]`)/2,
+                             `2018-2019`= (`mu[2]` + `mu[3]`)/2,
+                             `2019-2020`= (`mu[3]` + `mu[4]`)/2,
+                             `2020-2021`= (`mu[4]` + `mu[5]`)/2,
+                             `2021-2022`= (`mu[5]` + `mu[6]`)/2,
+                             `2022-2023`= (`mu[6]` + `mu[7]`)/2) %>%
+                      select(`2017-2018`,
+                             `2018-2019`,
+                             `2019-2020`,
+                             `2020-2021`,
+                             `2021-2022`,
+                             `2022-2023`) %>%
+                      summarise_all(median) %>%
+                      unlist()
+  
+  CrI_aggr <- samples[,mu_lwr:mu_upr] %>%
+                as_tibble() %>%
+                mutate(`2017-2018`= (`mu[1]` + `mu[2]`)/2,
+                       `2018-2019`= (`mu[2]` + `mu[3]`)/2,
+                       `2019-2020`= (`mu[3]` + `mu[4]`)/2,
+                       `2020-2021`= (`mu[4]` + `mu[5]`)/2,
+                       `2021-2022`= (`mu[5]` + `mu[6]`)/2,
+                       `2022-2023`= (`mu[6]` + `mu[7]`)/2) %>%
+                select(`2017-2018`,
+                       `2018-2019`,
+                       `2019-2020`,
+                       `2020-2021`,
+                       `2021-2022`,
+                       `2022-2023`)  %>%
+                summarise_all(quantile, probs = c(.025, .975))
 
-CrI_aggr <- samples[,mu_lwr:mu_upr] %>%
-              as_tibble() %>%
-              mutate(`2017-2018`= (`mu[1]` + `mu[2]`)/2,
-                     `2018-2019`= (`mu[2]` + `mu[3]`)/2,
-                     `2019-2020`= (`mu[3]` + `mu[4]`)/2,
-                     `2020-2021`= (`mu[4]` + `mu[5]`)/2,
-                     `2021-2022`= (`mu[5]` + `mu[6]`)/2,
-                     `2022-2023`= (`mu[6]` + `mu[7]`)/2) %>%
-              select(`2017-2018`,
-                     `2018-2019`,
-                     `2019-2020`,
-                     `2020-2021`,
-                     `2021-2022`,
-                     `2022-2023`)  %>%
-              summarise_all(quantile, probs = c(.025, .975))
-
-lwr95_aggr <- CrI_aggr %>% slice(1) %>% unlist()
-upr95_aggr <- CrI_aggr %>% slice(2) %>% unlist()
-
-tibble(pred_mu_aggr = pred_mu_aggr,
-       lwr95_aggr = lwr95_aggr,
-       upr95_aggr = upr95_aggr,
-       year = 2017:2022
-) %>%
-  ggplot() +
-  geom_point(aes(x = year, y = S, color = "NSDUH Data"),
-             data = tibble(year = c(2016:2018, 2021),
-                           S = S[1:4])) +
-  geom_errorbar(aes(x = year, y = S, ymin = S - 1.96*S.se, ymax = S + 1.96*S.se),
-                width = 0.05,
-                data = tibble(year = c(2016:2018, 2021),
-                              S = S[1:4],
-                              S.se = S.se[1:4])) +
-  geom_line(aes(x = year, y = pred_mu_aggr, color = "Model")) +
-  geom_ribbon(aes(x = year, y = pred_mu_aggr, ymin = lwr95_aggr, ymax = upr95_aggr),
-              color = "light blue",
-              fill = "light blue",
-              alpha = 0.5) +
-  labs(x = "Year",
-       y = "Statewide Prevalence of PWMO") +
-  scale_color_manual(name = "", values = c("NSDUH Data" = "black", "Model" = "blue")) +
-  theme_classic()
-
-ggsave("2_yr_mu_trend.png",
-       device="png",
-       path="WAprevalence/output",
-       width = 12,
-       height = 10,
-       units = "cm")
+  lwr95_aggr <- CrI_aggr %>% slice(1) %>% unlist()
+  upr95_aggr <- CrI_aggr %>% slice(2) %>% unlist()
+  
+  # plot model estimate against NSDUH
+  tibble(pred_mu_aggr = pred_mu_aggr,
+         lwr95_aggr = lwr95_aggr,
+         upr95_aggr = upr95_aggr,
+         year = 2017:2022
+  ) %>%
+    ggplot() +
+    geom_point(aes(x = year, y = S, color = "NSDUH Data"),
+               data = tibble(year = c(2016:2018, 2021),
+                             S = S[1:4])) +
+    geom_errorbar(aes(x = year, y = S, ymin = S - 1.96*S.se, ymax = S + 1.96*S.se),
+                  width = 0.05,
+                  data = tibble(year = c(2016:2018, 2021),
+                                S = S[1:4],
+                                S.se = S.se[1:4])) +
+    geom_line(aes(x = year, y = pred_mu_aggr, color = "Model")) +
+    geom_ribbon(aes(x = year, y = pred_mu_aggr, ymin = lwr95_aggr, ymax = upr95_aggr),
+                color = "light blue",
+                fill = "light blue",
+                alpha = 0.5) +
+    labs(x = "Year",
+         y = "Statewide Prevalence of PWMO") +
+    scale_color_manual(name = "", values = c("NSDUH Data" = "black", "Model" = "blue")) +
+    theme_classic()
+  
+  ggsave("2_yr_mu_trend.png",
+         device="png",
+         path="WAprevalence/output",
+         width = 12,
+         height = 10,
+         units = "cm")
 
 # CREATE BISCALE PLOT #
 
@@ -688,3 +712,140 @@ ggsave("2_yr_mu_trend.png",
           height = 10,
           units = "cm",
           bg = "white")
+   
+# EXAMINE MEDICAID DATA ON MOUD FOR BUPRENORPHINE ESTIMATE QUALITY CONTROL #
+# POPULATION: MEDICAID ENROLLEES WITH OUD IN WA FROM 2018-2024 #
+  
+  # import raw data
+  medicaid_moud <- read_excel("WAprevalence/data/MAT_ResultsHCA_202409_ewa_smsuppressed.xlsx")
+  
+  # simplify data for QC purpose
+  medicaid_moud_clean <- medicaid_moud %>%
+    mutate(buprenorphine_naloxone = as.numeric(`Treatment of Medicaid enrollees with OUD with buprenorphine-naloxone`),
+           buprenorphine = as.numeric(`Treatment of Medicaid enrollees with OUD with buprenorphine`)
+    ) %>%
+    separate_wider_delim(clndr_qtr, delim = "Q", names = c("year", "quarter")) %>%
+    filter(!(county %in% c("ACH WIDE", "STATE WIDE"))) %>%
+    select(year, quarter, county, buprenorphine_naloxone, buprenorphine)
+
+  # visualize data 
+  
+    # merge in county spatial info and generate map of medicaid data
+    map_medicaid_data <- function(outcome) {
+      
+      shape_county_WA %>%
+      rename(county = NAME) %>%
+      left_join(medicaid_moud_clean, by = c("county")) %>%
+      ggplot() +
+      geom_sf(aes(fill = {{outcome}})) +
+      scale_fill_gradient(low = "white",
+                          high = "red",
+                          guide = guide_colorbar(barheight = 12)) +
+      labs(fill = NULL) +
+      theme_map() +
+      theme(legend.position = "right") +
+      facet_wrap(~year + quarter, nrow = 9, ncol = 4) +
+      theme(strip.background = element_rect(fill = "white", color = NA),
+            strip.text = element_text(color = "black",
+                                      size = 12, 
+                                      hjust = 0),
+            legend.text = element_text(size = 12),
+            legend.title = element_text(size = 12)
+      )
+      
+    }
+    
+    # generate maps
+    buprenorphine_naloxone_map <- map_medicaid_data(buprenorphine_naloxone)
+    buprenorphine_map <- map_medicaid_data(buprenorphine)
+    
+    # save maps
+    ggsave("medicaid_moud_buprenorphine_naloxone_county.png",
+           buprenorphine_naloxone_map,
+           device="png",
+           path="WAprevalence/output/maps",
+           width = 15,
+           height = 20,
+           units = "cm",
+           bg = "white")
+    
+    ggsave("medicaid_moud_buprenorphine_county.png",
+           buprenorphine_map,
+           device="png",
+           path="WAprevalence/output/maps",
+           width = 15,
+           height = 20,
+           units = "cm",
+           bg = "white")
+    
+    # examine county-level trends via facet-wrap
+    county_trend_medicaid_data <- function(outcome) {
+      
+      medicaid_moud_clean %>%
+        mutate(across(c(year, quarter), as.numeric),
+               date = ymd(paste(year, (quarter - 1)*3 + 1, 1, sep ="-"))) %>%
+        ggplot(aes(x = date, y = {{outcome}})) +
+        geom_line(alpha = 0.5) +
+        facet_wrap(~county) +  
+        theme_classic()
+      
+    }
+    
+    # generate county time trends
+    county_trend_buprenorphine_naloxone <- county_trend_medicaid_data(buprenorphine_naloxone)
+    county_trend_buprenorphine <- county_trend_medicaid_data(buprenorphine)
+    
+    # save county time trends
+    ggsave("medicaid_moud_buprenorphine_naloxone_county_trend.png",
+           county_trend_buprenorphine_naloxone,
+           device="png",
+           path="WAprevalence/output/maps",
+           width = 30,
+           height = 20,
+           units = "cm",
+           bg = "white")
+    
+    ggsave("medicaid_moud_buprenorphine_county_trend.png",
+           county_trend_buprenorphine,
+           device="png",
+           path="WAprevalence/output/maps",
+           width = 30,
+           height = 20,
+           units = "cm",
+           bg = "white")
+    
+    # examine state-level trends
+    state_trend_medicaid_data <- function(outcome) {
+      
+      medicaid_moud %>%
+        mutate(buprenorphine_naloxone = as.numeric(`Treatment of Medicaid enrollees with OUD with buprenorphine-naloxone`),
+               buprenorphine = as.numeric(`Treatment of Medicaid enrollees with OUD with buprenorphine`)
+        ) %>%
+        filter(county == "STATE WIDE") %>%
+        separate_wider_delim(clndr_qtr, delim = "Q", names = c("year", "quarter")) %>%
+        mutate(across(c(year, quarter), as.numeric),
+               date = ymd(paste(year, (quarter - 1)*3 + 1, 1, sep ="-"))) %>%
+        ggplot(aes(x = date, y = {{outcome}})) +
+        geom_line() +
+        theme_classic()
+      
+    }
+    
+    # generate state time trends
+    state_trend_buprenorphine_naloxone <- state_trend_medicaid_data(buprenorphine_naloxone)
+    state_trend_buprenorphine <- state_trend_medicaid_data(buprenorphine)
+    
+    # save state time trends
+    ggsave("medicaid_moud_buprenorphine_naloxone_state_trend.png",
+           state_trend_buprenorphine_naloxone,
+           device="png",
+           path="WAprevalence/output/maps",
+           units = "cm",
+           bg = "white")
+    
+    ggsave("medicaid_moud_buprenorphine_state_trend.png",
+           state_trend_buprenorphine,
+           device="png",
+           path="WAprevalence/output/maps",
+           units = "cm",
+           bg = "white")
