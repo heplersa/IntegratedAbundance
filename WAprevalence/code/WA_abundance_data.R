@@ -153,6 +153,7 @@ library(tidycensus) # pull pop data from US Census
   nsduh_2017_2018_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2017_2018.csv")
   nsduh_2018_2019_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2018_2019.csv")
   nsduh_2021_2022_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2021_2022.csv")
+  nsduh_2022_2023_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2022_2023.csv")
   
   # process raw data
   process_nsduh <- function(nsduh_raw, year) {
