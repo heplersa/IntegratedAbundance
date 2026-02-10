@@ -377,7 +377,7 @@ compiled_mcmc <- compileNimble(nimble_mcmc, project = nimble_model, resetFunctio
 
 # Run the model 
 set.seed(2025)
-MCS <- 1*10^5
+MCS <- 1*10^6
 st  <- Sys.time()
 samples <- runMCMC(compiled_mcmc,
                    inits = mod_inits,

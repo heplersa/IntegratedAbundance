@@ -202,7 +202,7 @@ library(tidycensus) # pull pop data from US Census
 # compute intermediate values required to compute mean in normal model for the state-level prevalence
 # see section 3.1.2 of model paper for reference
 
-  # modeling data from 2017 - 2022
+  # modeling data from 2017 - 2023
   T0 <- 2017 
 
   # compute linear (ell.rate) and quadratic (ell.rate2) factors for the mean in the normal model

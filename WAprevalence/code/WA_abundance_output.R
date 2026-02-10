@@ -384,8 +384,8 @@ ggsave(filename = "N.png",
     # binomial outcomes
     post_binom_outcome_prev <- apply(samples[, beta_lwr:(beta_lwr+13)], 2, ilogit)
   
-    # poisson outcomes
-    post_pois_outcome_prev <- apply(samples[, (beta_lwr+14):(beta_upr)], 2, exp)
+    # poisson outcomes; exclude 2017-2018 for ED visit outcome
+    post_pois_outcome_prev <- apply(samples[, (beta_lwr+16):(beta_upr)], 2, exp)
     
   # compute posterior statistics of interest: mean, 95% CrI
     
@@ -399,24 +399,19 @@ ggsave(filename = "N.png",
     # poisson outcomes
     post_pois_outcome_prev <- list(colMeans(post_pois_outcome_prev),
                                     apply(post_pois_outcome_prev,2,
-                                          quantile,probs=c(.025,.975)
+                                          quantile,probs=c(.025,.975),
                                     )
     )
   
-  # remove missing years for ED outcome
-  post_pois_outcome_prev[[1]][1:2] <- NA 
-  post_pois_outcome_prev[[2]][1, 1:2] <- NA
-  post_pois_outcome_prev[[2]][2, 1:2] <- NA 
-  
-  # re-combine posterior means and credible intervals
-  post_outcome_prev <- list(c(post_pois_outcome_prev[[1]], post_binom_outcome_prev[[1]]),
-                            cbind(post_pois_outcome_prev[[2]], post_binom_outcome_prev[[2]]))
+  # re-combine posterior means and credible intervals; NA for 2017-2018 ED visit outcome
+  post_outcome_prev <- list(c(post_binom_outcome_prev[[1]], c(NA, NA), post_pois_outcome_prev[[1]]),
+                            cbind(post_binom_outcome_prev[[2]], matrix(c(NA, NA, NA, NA), nrow=2, ncol=2), post_pois_outcome_prev[[2]]))
   
   # specify outcomes name and size
-  outcomes <- c("ED visit due to opioid misuse",
-                "Hospitalization due to opioid misuse",
-                "Buprenorphine prescription",
-                "Death due to opioid misuse"
+  outcomes <- c("Buprenorphine prescription", 
+                "Death due to opioid misuse",
+                "ED visit due to opioid misuse",
+                "Hospitalization due to opioid misuse"
   )
   
   K <- length(outcomes)
@@ -424,10 +419,10 @@ ggsave(filename = "N.png",
   # estimated prevalence among PWMO (binomial outcomes) & rate per-person among PWMO (poisson)
   # y-axis ticks mapped ot underlying prevalence or rate value
   tibble(pred_beta = post_outcome_prev[[1]],
-           lwr95 = post_outcome_prev[[2]][1, ],
-           upr95 = post_outcome_prev[[2]][2, ],
-           year = rep(2017:2023, K),
-           outcome = rep(outcomes, each = 7)
+         lwr95 = post_outcome_prev[[2]][1, ],
+         upr95 = post_outcome_prev[[2]][2, ],
+         year = rep(2017:2023, K),
+         outcome = rep(outcomes, each = 7)
     ) %>%
       mutate(across(c(pred_beta, lwr95, upr95), log)) %>%
       ggplot(aes(x = year, y = pred_beta, fill = outcome)) +
@@ -505,13 +500,13 @@ ggsave(filename = "N.png",
   ) %>%
     ggplot() +
     geom_point(aes(x = year, y = S, color = "NSDUH Data"),
-               data = tibble(year = c(2016:2018, 2021),
-                             S = S[1:4])) +
+               data = tibble(year = c(2016:2018, 2021, 2022),
+                             S = S[1:5])) +
     geom_errorbar(aes(x = year, y = S, ymin = S - 1.96*S.se, ymax = S + 1.96*S.se),
                   width = 0.05,
-                  data = tibble(year = c(2016:2018, 2021),
-                                S = S[1:4],
-                                S.se = S.se[1:4])) +
+                  data = tibble(year = c(2016:2018, 2021, 2022),
+                                S = S[1:5],
+                                S.se = S.se[1:5])) +
     geom_line(aes(x = year, y = pred_mu_aggr, color = "Model")) +
     geom_ribbon(aes(x = year, y = pred_mu_aggr, ymin = lwr95_aggr, ymax = upr95_aggr),
                 color = "light blue",
