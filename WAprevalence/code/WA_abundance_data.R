@@ -153,6 +153,7 @@ library(tidycensus) # pull pop data from US Census
   nsduh_2017_2018_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2017_2018.csv")
   nsduh_2018_2019_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2018_2019.csv")
   nsduh_2021_2022_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2021_2022.csv")
+  nsduh_2022_2023_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2022_2023.csv")
   
   # process raw data
   process_nsduh <- function(nsduh_raw, year) {
@@ -177,11 +178,13 @@ library(tidycensus) # pull pop data from US Census
   nsduh_2017_2018_processed <- process_nsduh(nsduh_2017_2018_raw, "2017-2018")
   nsduh_2018_2019_processed <- process_nsduh(nsduh_2018_2019_raw, "2018-2019")
   nsduh_2021_2022_processed <- process_nsduh(nsduh_2021_2022_raw, "2021-2022")
+  nsduh_2022_2023_processed <- process_nsduh(nsduh_2022_2023_raw, "2022-2023")
   
   nsduh_processed <- nsduh_2016_2017_processed %>%
                         bind_rows(nsduh_2017_2018_processed,
                                   nsduh_2018_2019_processed,
-                                  nsduh_2021_2022_processed)
+                                  nsduh_2021_2022_processed,
+                                  nsduh_2022_2023_processed)
   
   # rename for Bayesian model
   S <- nsduh_processed$prev
@@ -202,15 +205,16 @@ library(tidycensus) # pull pop data from US Census
   # modeling data from 2017 - 2022
   T0 <- 2017 
 
-  # compute slope (ell.rate) for the mean in the normal model
-  ell.lb <- c(2016,2017,2018,2021)
-  ell.ub <- c(2017,2018,2019,2022)
+  # compute linear (ell.rate) and quadratic (ell.rate2) factors for the mean in the normal model
+  ell.lb <- c(2016,2017,2018,2021, 2022)
+  ell.ub <- c(2017,2018,2019,2022, 2023)
   ell.lb <- ell.lb - T0 + 1
   ell.ub <- ell.ub - T0 + 1
-  ell.rate <- (ell.ub^02+ell.ub-ell.lb^2+ell.lb)/(2*(ell.ub-ell.lb+1))
+  ell.rate <- (ell.ub + ell.lb)/2
+  ell.rate2 <- (ell.ub*(ell.ub + 1)*(2*ell.ub + 1) - ell.lb*(ell.lb - 1)*(2*ell.lb - 1))/6
 
 # SAVE PREPARED DATA FOR USE IN NIMBLE MODEL
 save(adj, num,
      yfit,
-     S, S.se, logit_S, logit_S.se, ell.rate,
+     S, S.se, logit_S, logit_S.se, ell.rate, ell.rate2,
      file = "WAprevalence/data/data_for_analysis.Rda")

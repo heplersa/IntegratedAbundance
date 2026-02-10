@@ -58,7 +58,7 @@ model_code <- nimbleCode({
     }
     
     # mean state-wide average risk of misuse in year t
-    mu[t] <- ilogit(beta.mu[1] + beta.mu[2]*t)
+    mu[t] <- ilogit(beta.mu[1] + beta.mu[2]*t + beta.mu[3]*t^2)
     
   }
   
@@ -101,7 +101,7 @@ model_code <- nimbleCode({
     }
     
     # mean state-wide risk of misuse in year t
-    mu[t] <- ilogit(beta.mu[1] + beta.mu[2]*t)
+    mu[t] <- ilogit(beta.mu[1] + beta.mu[2]*t + beta.mu[3]*t^2)
     
   }
   
@@ -128,7 +128,7 @@ model_code <- nimbleCode({
   # state-wide survey data model
   for(l in 1:L){
     
-    S[l] ~ dnorm(beta.mu[1]+beta.mu[2]*ell.rate[l], sd=S.se[l])
+    S[l] ~ dnorm(beta.mu[1]+beta.mu[2]*ell.rate[l] + beta.mu[3]*ell.rate2[l], sd=S.se[l])
     
   }
   
@@ -195,7 +195,7 @@ model_code <- nimbleCode({
     
   }
   
-  beta.mu[1:2] ~ dmnorm(mean = mean.mu[1:2], cov = cov.mu[1:2, 1:2])
+  beta.mu[1:3] ~ dmnorm(mean = mean.mu[1:3], cov = cov.mu[1:3, 1:3])
   
   cov.eps[1:K, 1:K] ~ dwish(R=cov.eps.R[1:K, 1:K], df=K)
   
@@ -234,12 +234,13 @@ mod_constants <- list(R = n,
                       K = K,
                       L = length(ell.rate),
                       ell.rate = ell.rate,
+                      ell.rate2 = ell.rate2,
                       P = yfit$pop,
                       num = num,
                       adj = adj, 
                       S.se = logit_S.se,
-                      mean.mu = rep(0, 2),
-                      cov.mu = 10^4*diag(2),
+                      mean.mu = rep(0, 3),
+                      cov.mu = 10^4*diag(3),
                       mean.eps = rep(0, K),
                       cov.eps.R = diag(K),
                       c_ed = c_ed,
@@ -253,7 +254,7 @@ mod_data <- list(y=as.matrix(yfit[,c("pmp", "death", "ed", "hosp")]),
 )
 
 # specify initial values
-logit_beta.mu.init <- lm(logit_S~ell.rate)$coefficients
+logit_beta.mu.init <- lm(logit_S~ell.rate + ell.rate2)$coefficients
 beta.init <- matrix(data = 0, nrow = T, ncol = K)
 Ninit <- floor(yfit$pop*ilogit(logit_beta.mu.init[1]))
 finit <- matrix(data = 0, nrow = n*T, ncol = K)
@@ -376,7 +377,7 @@ compiled_mcmc <- compileNimble(nimble_mcmc, project = nimble_model, resetFunctio
 
 # Run the model 
 set.seed(2025)
-MCS <- 1*10^6
+MCS <- 1*10^5
 st  <- Sys.time()
 samples <- runMCMC(compiled_mcmc,
                    inits = mod_inits,
