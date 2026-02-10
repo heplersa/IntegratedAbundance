@@ -205,15 +205,16 @@ library(tidycensus) # pull pop data from US Census
   # modeling data from 2017 - 2022
   T0 <- 2017 
 
-  # compute slope (ell.rate) for the mean in the normal model
+  # compute linear (ell.rate) and quadratic (ell.rate2) factors for the mean in the normal model
   ell.lb <- c(2016,2017,2018,2021, 2022)
   ell.ub <- c(2017,2018,2019,2022, 2023)
   ell.lb <- ell.lb - T0 + 1
   ell.ub <- ell.ub - T0 + 1
-  ell.rate <- (ell.ub^02+ell.ub-ell.lb^2+ell.lb)/(2*(ell.ub-ell.lb+1))
+  ell.rate <- (ell.ub + ell.lb)/2
+  ell.rate2 <- (ell.ub*(ell.ub + 1)*(2*ell.ub + 1) - ell.lb*(ell.lb - 1)*(2*ell.lb - 1))/6
 
 # SAVE PREPARED DATA FOR USE IN NIMBLE MODEL
 save(adj, num,
      yfit,
-     S, S.se, logit_S, logit_S.se, ell.rate,
+     S, S.se, logit_S, logit_S.se, ell.rate, ell.rate2,
      file = "WAprevalence/data/data_for_analysis.Rda")
