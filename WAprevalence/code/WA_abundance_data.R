@@ -211,7 +211,7 @@ library(tidycensus) # pull pop data from US Census
   ell.lb <- ell.lb - T0 + 1
   ell.ub <- ell.ub - T0 + 1
   ell.rate <- (ell.ub + ell.lb)/2
-  ell.rate2 <- (ell.ub*(ell.ub + 1)*(2*ell.ub + 1) - ell.lb*(ell.lb - 1)*(2*ell.lb - 1))/6
+  ell.rate2 <- (ell.ub*(ell.ub + 1)*(2*ell.ub + 1) - ell.lb*(ell.lb - 1)*(2*ell.lb - 1))/(6*(ell.ub - ell.lb + 1))
 
 # SAVE PREPARED DATA FOR USE IN NIMBLE MODEL
 save(adj, num,
