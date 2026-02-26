@@ -1,6 +1,7 @@
 # FIT INTEGRATED ABUNDANCE MODEL USING PROCESSED WA DATA #
+# MODEL PMP AS POISSON (MULTIPLE PER PERSON POSSIBLE) #
 # BRIAN N. WHITE #
-# 2025-01-18 #
+# 2026-02-16 #
 
 # LOAD R PACKAGES
 library(tidyverse) # data manipulation and visualization
@@ -16,7 +17,7 @@ model_code <- nimbleCode({
     
     for(i in 1:R){ # counties
       
-      for(j in 1:2){ # outcomes (each patient contributes only one count)
+      for(j in 2:2){ # outcomes (each patient contributes only one count)
         
         y[(t-1)*R+i,j] ~ dbinom(pi[(t-1)*R+i,j], N[(t-1)*R+i])
         mu.f[(t-1)*R+i,j] <- 0
@@ -25,26 +26,29 @@ model_code <- nimbleCode({
       
       # outcomes (each patient can contribute more than one count)
       
-        # shift baseline time to be 2019 for ED visit outcome as no data available for 2017-2018
-        y[(t-1+2)*R+i,3] ~ dpois(pi[(t-1+2)*R+i,3]*N[(t-1+2)*R+i])
-        mu.f[(t-1+2)*R+i,3] <- 0
-          
-        # hospitalization outcome has data for all years so no need to shift time-index
-        y[(t-1)*R+i,4] ~ dpois(pi[(t-1)*R+i,4]*N[(t-1)*R+i])
-        mu.f[(t-1)*R+i,4] <- 0
-        
-        # poisson outcomes are censored in [1,9]
-        censored_ed[(t-1+2)*R+i] ~ dinterval(y[(t-1+2)*R+i,3], c_ed[(t-1+2)*R+i, 1:2])
-        censored_hosp[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,4], c_hosp[(t-1)*R+i, 1:2])
+      # shift baseline time to be 2019 for ED visit outcome as no data available for 2017-2018
+      y[(t-1+2)*R+i,3] ~ dpois(pi[(t-1+2)*R+i,3]*N[(t-1+2)*R+i])
+      mu.f[(t-1+2)*R+i,3] <- 0
+      
+      # pmp & hospitalization outcome has data for all years so no need to shift time-index
+      y[(t-1)*R+i,4] ~ dpois(pi[(t-1)*R+i,4]*N[(t-1)*R+i])
+      mu.f[(t-1)*R+i,4] <- 0
+      
+      y[(t-1)*R+i,1] ~ dpois(pi[(t-1)*R+i,1]*N[(t-1)*R+i])
+      mu.f[(t-1)*R+i,1] <- 0
+      
+      # poisson outcomes are censored in [1,9]
+      censored_ed[(t-1+2)*R+i] ~ dinterval(y[(t-1+2)*R+i,3], c_ed[(t-1+2)*R+i, 1:2])
+      censored_hosp[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,4], c_hosp[(t-1)*R+i, 1:2])
       
       # outcome error term
       eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], cov = cov.eps[1:K, 1:K])
       
       # logistic link for binomial outcome(s)
-      pi[(t-1)*R+i,1] <- ilogit(beta[t,1] + (f[(t-1)*R+i,1] + mu.f[(t-1)*R+i,1]) + eps[(t-1)*R+i,1])
       pi[(t-1)*R+i,2] <- ilogit(beta[t,2] + (f[(t-1)*R+i,2] + mu.f[(t-1)*R+i,2]) + eps[(t-1)*R+i,2])
       
       # log link for poisson outcome(s)
+      pi[(t-1)*R+i,1] <- exp(beta[t,1] + (f[(t-1)*R+i,1] + mu.f[(t-1)*R+i,1]) + eps[(t-1)*R+i,1])
       pi[(t-1+2)*R+i,3] <- exp(beta[t+2,3] + (f[(t-1+2)*R+i,3] + mu.f[(t-1+2)*R+i,3]) + eps[(t-1+2)*R+i,3])
       pi[(t-1)*R+i,4] <- exp(beta[t,4] + (f[(t-1)*R+i,4] + mu.f[(t-1)*R+i,4]) + eps[(t-1)*R+i,4])
       
@@ -66,7 +70,7 @@ model_code <- nimbleCode({
     
     for(i in 1:R){ # counties
       
-      for(j in 1:2){ # outcomes (each patient contributes only one count)
+      for(j in 2:2){ # outcomes (each patient contributes only one count)
         
         y[(t-1)*R+i,j] ~ dbinom(pi[(t-1)*R+i,j], N[(t-1)*R+i])
         mu.f[(t-1)*R+i,j] <- phi.f[j]*f[(t-2)*R+i, j]
@@ -74,24 +78,27 @@ model_code <- nimbleCode({
       }
       
       # outcomes (each patient can contribute more than one count)
-        
-        # hospitalization outcome has data for all years so no need to shift time-index
-        y[(t-1)*R+i,4] ~ dpois(pi[(t-1)*R+i,4]*N[(t-1)*R+i])
-        mu.f[(t-1)*R+i,4] <- phi.f[4]*f[(t-2)*R+i, 4]
-        
-        # poisson outcomes are censored in [1,9]
-        censored_hosp[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,4], c_hosp[(t-1)*R+i, 1:2])
+      
+      # pmp & hospitalization outcome has data for all years so no need to shift time-index
+      y[(t-1)*R+i,4] ~ dpois(pi[(t-1)*R+i,4]*N[(t-1)*R+i])
+      mu.f[(t-1)*R+i,4] <- phi.f[4]*f[(t-2)*R+i, 4]
+      
+      y[(t-1)*R+i,1] ~ dpois(pi[(t-1)*R+i,1]*N[(t-1)*R+i])
+      mu.f[(t-1)*R+i,1] <- phi.f[1]*f[(t-2)*R+i, 1]
+      
+      # poisson outcomes are censored in [1,9]
+      censored_hosp[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,4], c_hosp[(t-1)*R+i, 1:2])
       
       # outcome error term
       eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], cov = cov.eps[1:K, 1:K])
       
       # logistic link for binomial outcome(s)
-      pi[(t-1)*R+i,1] <- ilogit(beta[t,1] + (f[(t-1)*R+i,1] + mu.f[(t-1)*R+i,1]) + eps[(t-1)*R+i,1])
       pi[(t-1)*R+i,2] <- ilogit(beta[t,2] + (f[(t-1)*R+i,2] + mu.f[(t-1)*R+i,2]) + eps[(t-1)*R+i,2])
       
       # log link for poisson outcome(s)
+      pi[(t-1)*R+i,1] <- exp(beta[t,1] + (f[(t-1)*R+i,1] + mu.f[(t-1)*R+i,1]) + eps[(t-1)*R+i,1])
       pi[(t-1)*R+i,4] <- exp(beta[t,4] + (f[(t-1)*R+i,4] + mu.f[(t-1)*R+i,4]) + eps[(t-1)*R+i,4])
-
+      
       # latent counts (process model)
       mu.u[(t-1)*R+i] <- phi.u*u[(t-2)*R+i] 
       lambda[(t-1)*R+i] <- exp((u[(t-1)*R+i] + mu.u[(t-1)*R+i]) + v[(t-1)*R+i])
@@ -134,30 +141,30 @@ model_code <- nimbleCode({
   
   # spatial random effects for data level
   
-    # outcomes with data over whole study period
-    for(j in c(1,2,4)){
+  # outcomes with data over whole study period
+  for(j in c(1,2,4)){
+    
+    for(t in 1:T){
       
-      for(t in 1:T){
-        
-        f[((t-1)*R+1):((t-1)*R+R), j] ~ dcar_normal(adj=adj[], 
-                                                    num=num[],
-                                                    tau=tau.f[j],
-                                                    zero_mean=1)
-        
-      }
+      f[((t-1)*R+1):((t-1)*R+R), j] ~ dcar_normal(adj=adj[], 
+                                                  num=num[],
+                                                  tau=tau.f[j],
+                                                  zero_mean=1)
       
     }
+    
+  }
   
-    # outcome (ED visits) without data over whole study period
-    for(t in 3:T){
-        
-        f[((t-1)*R+1):((t-1)*R+R), 3] ~ dcar_normal(adj=adj[], 
-                                                    num=num[],
-                                                    tau=tau.f[3],
-                                                    zero_mean=1)
-        
-      }
-      
+  # outcome (ED visits) without data over whole study period
+  for(t in 3:T){
+    
+    f[((t-1)*R+1):((t-1)*R+R), 3] ~ dcar_normal(adj=adj[], 
+                                                num=num[],
+                                                tau=tau.f[3],
+                                                zero_mean=1)
+    
+  }
+  
   # spatial random effect for process level
   for(t in 1:T){
     
@@ -170,23 +177,23 @@ model_code <- nimbleCode({
   
   # time-varying intercepts for data level
   
-    # outcomes with data over whole study period
-    for(j in c(1,2,4)){
+  # outcomes with data over whole study period
+  for(j in c(1,2,4)){
+    
+    for(t in 1:T){
       
-      for(t in 1:T){
-        
-        beta[t, j] ~ dflat() 
-        
-      }
+      beta[t, j] ~ dflat() 
       
     }
-      
-    # outcome (ED visits) without data over whole study period
-       for(t in 3:T){
-          
-          beta[t, 3] ~ dflat() 
-          
-        }
+    
+  }
+  
+  # outcome (ED visits) without data over whole study period
+  for(t in 3:T){
+    
+    beta[t, 3] ~ dflat() 
+    
+  }
   
   for(j in 1:K){
     
@@ -392,4 +399,4 @@ samples <- runMCMC(compiled_mcmc,
                    setSeed = 2) 
 
 Sys.time()-st
-save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_2026_02_09.Rda")
+save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_pmp_pois_2026_02_16.Rda")

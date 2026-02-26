@@ -22,7 +22,7 @@ library(readxl)
 load("WAprevalence/data/data_for_analysis.Rda")
 
 # IMPORT MCMC OUTPUT FROM MODEL
-load("WAprevalence/output/mcmc/MCMC_no_covariates_2025_12_16.Rda")
+load("WAprevalence/output/mcmc/MCMC_no_covariates_2026_02_09.Rda")
 
 # IMPORT SHAPE FILES FOR WA COUNTIES
 load("WAprevalence/data/shape_county_WA.Rda")
@@ -54,14 +54,11 @@ MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 3]"), 
 MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 4]"), ISB = F, filename = "eps_hosp", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = "cov.eps", filename = "cov.eps", wd = "WAprevalence/output/diagnostics")
 
-# EXTRACT POSTERIOR MEANS, 95% CrI (QUANTILES), SD AND NEW GR DIAGNOSTIC STAT
-
-# remove un-sampled MCMC parameters for ED outcome years 2017-2018 as these years missing for this outcome and thus not modeled; 39 counties x 2 years = 78
+# EXTRACT POSTERIOR MEANS, 95% CrI (QUANTILES), SD
 results <- list(colMeans(samples, na.rm = T),
                   apply(samples, 2,
                         quantile, probs=c(.025,.975), na.rm = T),
-                  apply(samples, 2, sd, na.rm = T), 
-                  apply(samples, 2, function(x) stable.GR(x, multivariate = F)$psrf))
+                  apply(samples, 2, sd, na.rm = T))
 
 # specify indices of parameters of interest
 pmp_lwr <- which(names(results[[1]])=="pi[1, 1]")
@@ -95,7 +92,6 @@ results_to_tibble <- function(results, par) {
          lwr95 = results[[2]][1, par_lwr:par_upr],
          upr95 = results[[2]][2, par_lwr:par_upr],
          sd = results[[3]][par_lwr:par_upr],
-         gr = results[[4]][par_lwr:par_upr],
          pmp_obs_rate = (yfit$pmp/pop),
          death_obs_rate = (yfit$death/pop),
          ed_obs_rate = (yfit$ed/pop),
@@ -107,7 +103,7 @@ results_to_tibble <- function(results, par) {
 
 pmp_results <- results_to_tibble(results, "pmp")
 death_results <- results_to_tibble(results, "death")
-ed_results <- results_to_tibble(results, "ed") %>% mutate(across(c("mean", "lwr95", "upr95", "gr"),  function(x) case_when(year %in% 2017:2018 ~ NA, .default = x)))
+ed_results <- results_to_tibble(results, "ed")  %>% mutate(across(c("mean", "lwr95", "upr95"),  function(x) case_when(year %in% 2017:2018 ~ NA, .default = x)))
 hosp_results <- results_to_tibble(results, "hosp")
 
 lambda_results <- results_to_tibble(results, "lambda") %>% 
@@ -190,13 +186,36 @@ write.csv(N_prev_results_csv,
           file = "WAprevalence/output/tables/N_prev_results.csv",
           row.names = F)
 
-# EXAMINE GR STATISTICS FOR SELECT PARAMETERS
-results[[4]][N_lwr:N_upr] %>% mean
-results[[4]][N_lwr:N_upr] %>% median
-results[[4]][N_lwr:N_upr] %>% sd
-results[[4]][lambda_lwr:lambda_upr] %>% mean
-results[[4]][lambda_lwr:lambda_upr] %>% median
-results[[4]][lambda_lwr:lambda_upr] %>% sd
+# EXAMINE MODIFIED GELMAN-RUBIN (GR) STATISTICS FOR SELECT PARAMETERS
+
+  # exclude 2017-2018 for ED outcome as these were not modeled and therefore not sampled
+  unsampled_params <- c(which(colnames(samples)=="pi[1, 3]"):which(colnames(samples)=="pi[78, 3]"),
+                        which(colnames(samples)=="f[1, 3]"):which(colnames(samples)=="f[78, 3]"),
+                        which(colnames(samples)=="beta[1, 3]"):which(colnames(samples)=="beta[2, 3]"))
+  
+  # compute modified GR stat for each sampled parameter
+  gr_stats <- apply(samples[ ,-unsampled_params], 2, function(x) stable.GR(x, multivariate = F)$psrf)
+  
+  # examine distribution of GR stats across counties and years for parameters of interest
+  gr_stat_summary <- function(par) {
+    
+    par_lwr <- get(paste(par, "_lwr", sep = ""), envir = .GlobalEnv)
+    par_upr <- get(paste(par, "_upr", sep = ""), envir = .GlobalEnv)
+    
+    c(mean(gr_stats[par_lwr:par_upr]), median(gr_stats[par_lwr:par_upr]), sd(gr_stats[par_lwr:par_upr]))
+    
+    
+  }
+  
+  
+  gr_stat_summary("pmp")
+  gr_stat_summary("death")
+  gr_stat_summary("ed")
+  gr_stat_summary("hosp")
+  gr_stat_summary("N")
+  gr_stat_summary("lambda")
+  gr_stat_summary("beta")
+  gr_stat_summary("mu")
 
 # CREATE CHOROPLETH MAPS
 
@@ -365,8 +384,8 @@ ggsave(filename = "N.png",
     # binomial outcomes
     post_binom_outcome_prev <- apply(samples[, beta_lwr:(beta_lwr+13)], 2, ilogit)
   
-    # poisson outcomes
-    post_pois_outcome_prev <- apply(samples[, (beta_lwr+14):(beta_upr)], 2, exp)
+    # poisson outcomes; exclude 2017-2018 for ED visit outcome
+    post_pois_outcome_prev <- apply(samples[, (beta_lwr+16):(beta_upr)], 2, exp)
     
   # compute posterior statistics of interest: mean, 95% CrI
     
@@ -380,24 +399,19 @@ ggsave(filename = "N.png",
     # poisson outcomes
     post_pois_outcome_prev <- list(colMeans(post_pois_outcome_prev),
                                     apply(post_pois_outcome_prev,2,
-                                          quantile,probs=c(.025,.975)
+                                          quantile,probs=c(.025,.975),
                                     )
     )
   
-  # remove missing years for ED outcome
-  post_pois_outcome_prev[[1]][1:2] <- NA 
-  post_pois_outcome_prev[[2]][1, 1:2] <- NA
-  post_pois_outcome_prev[[2]][2, 1:2] <- NA 
-  
-  # re-combine posterior means and credible intervals
-  post_outcome_prev <- list(c(post_pois_outcome_prev[[1]], post_binom_outcome_prev[[1]]),
-                            cbind(post_pois_outcome_prev[[2]], post_binom_outcome_prev[[2]]))
+  # re-combine posterior means and credible intervals; NA for 2017-2018 ED visit outcome
+  post_outcome_prev <- list(c(post_binom_outcome_prev[[1]], c(NA, NA), post_pois_outcome_prev[[1]]),
+                            cbind(post_binom_outcome_prev[[2]], matrix(c(NA, NA, NA, NA), nrow=2, ncol=2), post_pois_outcome_prev[[2]]))
   
   # specify outcomes name and size
-  outcomes <- c("ED visit due to opioid misuse",
-                "Hospitalization due to opioid misuse",
-                "Buprenorphine prescription",
-                "Death due to opioid misuse"
+  outcomes <- c("Buprenorphine prescription", 
+                "Death due to opioid misuse",
+                "ED visit due to opioid misuse",
+                "Hospitalization due to opioid misuse"
   )
   
   K <- length(outcomes)
@@ -405,10 +419,10 @@ ggsave(filename = "N.png",
   # estimated prevalence among PWMO (binomial outcomes) & rate per-person among PWMO (poisson)
   # y-axis ticks mapped ot underlying prevalence or rate value
   tibble(pred_beta = post_outcome_prev[[1]],
-           lwr95 = post_outcome_prev[[2]][1, ],
-           upr95 = post_outcome_prev[[2]][2, ],
-           year = rep(2017:2023, K),
-           outcome = rep(outcomes, each = 7)
+         lwr95 = post_outcome_prev[[2]][1, ],
+         upr95 = post_outcome_prev[[2]][2, ],
+         year = rep(2017:2023, K),
+         outcome = rep(outcomes, each = 7)
     ) %>%
       mutate(across(c(pred_beta, lwr95, upr95), log)) %>%
       ggplot(aes(x = year, y = pred_beta, fill = outcome)) +
@@ -486,13 +500,13 @@ ggsave(filename = "N.png",
   ) %>%
     ggplot() +
     geom_point(aes(x = year, y = S, color = "NSDUH Data"),
-               data = tibble(year = c(2016:2018, 2021),
-                             S = S[1:4])) +
+               data = tibble(year = c(2016:2018, 2021, 2022),
+                             S = S[1:5])) +
     geom_errorbar(aes(x = year, y = S, ymin = S - 1.96*S.se, ymax = S + 1.96*S.se),
                   width = 0.05,
-                  data = tibble(year = c(2016:2018, 2021),
-                                S = S[1:4],
-                                S.se = S.se[1:4])) +
+                  data = tibble(year = c(2016:2018, 2021, 2022),
+                                S = S[1:5],
+                                S.se = S.se[1:5])) +
     geom_line(aes(x = year, y = pred_mu_aggr, color = "Model")) +
     geom_ribbon(aes(x = year, y = pred_mu_aggr, ymin = lwr95_aggr, ymax = upr95_aggr),
                 color = "light blue",
