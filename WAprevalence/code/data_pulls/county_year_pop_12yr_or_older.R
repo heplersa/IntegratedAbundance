@@ -1,0 +1,8 @@
+# PULL COUNTY-LEVEL POPULATION ESTIMATES (2017-2023) FROM ACS #
+# BRIAN N. WHITE #
+# 2026-03-05 #
+
+# IMPORT R PACKAGES #
+library(tidyverse)
+library(tidycensus)
+
