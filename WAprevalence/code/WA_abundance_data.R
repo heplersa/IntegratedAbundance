@@ -72,6 +72,52 @@ library(tidycensus) # pull pop data from US Census
                                 mutate(county = str_to_lower(county)) %>%
                                 filter(year %in% 2017:2023)
 
+# compute county-level population aged 12+ to match NSDUH survey universe
+# approach: compute 12+ age share from ACS 5-year estimates, apply to OFM true yearly totals
+# source: US Census Bureau ACS via tidycensus; table B01001 (Sex by Age)
+
+  # ACS variables needed to compute 12+ age share
+  # verify codes with: load_variables(2023, "acs5") %>% filter(str_detect(name, "B01001_0"))
+  age_vars <- c(total = "B01001_001",
+                male_under5 = "B01001_003",
+                male_5to9 = "B01001_004",
+                male_10to14 = "B01001_005",
+                female_under5 = "B01001_027",
+                female_5to9 = "B01001_028",
+                female_10to14 = "B01001_029")
+
+  pull_acs_age_share <- function(year) {
+
+          get_acs(geography = "county",
+                  state = "WA",
+                  variables = age_vars,
+                  year = year,
+                  survey = "acs5",
+                  output = "wide") %>%
+            mutate(year = year) %>%
+            rename(county = NAME) %>%
+            mutate(county = str_remove(county, " County, Washington"),
+                   county = str_to_lower(county)) %>%
+            # compute 12+ share; subtract under-5, 5-9, and 2/5 of 10-14
+            # (assumes uniform age distribution within 10-14 bin for ages 10-11)
+            mutate(pop_under12 = (male_under5E + male_5to9E + (2/5)*male_10to14E) +
+                                 (female_under5E + female_5to9E + (2/5)*female_10to14E),
+                   share_12plus = (totalE - pop_under12) / totalE) %>%
+            select(year,
+                   county,
+                   share_12plus)
+
+  }
+
+  acs_age_share <- map_dfr(2017:2023, pull_acs_age_share)
+
+  # apply ACS 12+ share to OFM yearly totals; overwrite pop to match NSDUH 12+ universe
+  WA_county_pop_processed <- WA_county_pop_processed %>%
+                                left_join(acs_age_share,
+                                          by = c("year", "county")) %>%
+                                mutate(pop = round(pop * share_12plus)) %>%
+                                select(county, year, pop)
+
 # outcome variables: 3 outcomes (pmp, death, OUD), 6 years (2017-2022), 39 counties
 # source: confidential data; pulled by Dave Kline Jan 2025
   
@@ -136,7 +182,7 @@ library(tidycensus) # pull pop data from US Census
             arrange(year, county)
   
   # check that there is no missing data in marginal outcomes; for ed and hospitalization counts <5 are censored; account for this in the model
-  apply(outcomes_processed[, c("pmp", "death", "ed", "hosp")], 2, function(x) sum(is.na(x))) == c(0, 0)
+  apply(outcomes_processed[, c("pmp", "death", "ed", "hosp")], 2, function(x) sum(is.na(x))) == c(0, 0, 0, 0)
   # check that all counties-years are present; 6 years x 39 counties = 234 rows
   nrow(outcomes_processed) == 7*39
 
