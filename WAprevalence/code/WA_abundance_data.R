@@ -51,72 +51,43 @@ library(tidycensus) # pull pop data from US Census
 
 # PREPARE OUTCOME VARIABLES 
 
-# load county level population estimates from the WA state office of financial management (OFM); available from 2010-2022
-# source: https://ofm.wa.gov/washington-data-research/population-demographics/population-estimates/small-area-estimates-program
+  # load county-level population estimates aged 12+ from Census Population Estimates Program
+  # source: US Census Bureau PEP via tidycensus
+  # approach: subtract under-12 pop from total, assuming uniformity within 10-14 age bin for ages 10-11
 
-  # import raw data
-  WA_county_pop_raw <- read.csv("WAprevalence/data/population/saep_county20.csv")
-  # process raw data
-  WA_county_pop_processed <- WA_county_pop_raw %>%
-                                slice(1:39) %>%
-                                select(1, 4:13, 15:19) %>%
-                                rename(county = `County.Name`) %>%
-                                pivot_longer(cols = 2:16,
-                                             names_to = c("year"),
-                                             values_to = c("pop")) %>%
-                                mutate(pop = str_remove_all(pop, ","),
-                                       year = str_remove(year, "Estimated.Total.Population."),
-                                       year = str_remove(year, "OFM.Adjusted.Total.Population.")) %>%
-                                mutate(across(c(year, pop),
-                                              as.numeric)) %>%
-                                mutate(county = str_to_lower(county)) %>%
-                                filter(year %in% 2017:2023)
+    # pull vintage 2019 PEP data; DATE codes 10-12 = July 1 estimates for 2017-2019
+    # source: https://www.census.gov/data/developers/data-sets/popest-popproj/popest/popest-vars/2019.html
+    pep_2017_2019 <- get_estimates(geography = "county",
+                                   product = "characteristics",
+                                   breakdown = "AGEGROUP",
+                                   breakdown_labels = TRUE,
+                                   state = "WA",
+                                   time_series = TRUE,
+                                   vintage = 2019) %>%
+      filter(DATE %in% 10:12) %>%
+      mutate(year = DATE - 10 + 2017) %>%
+      select(-DATE)
 
-# compute county-level population aged 12+ to match NSDUH survey universe
-# approach: compute 12+ age share from ACS 5-year estimates, apply to OFM true yearly totals
-# source: US Census Bureau ACS via tidycensus; table B01001 (Sex by Age)
+    # pull vintage 2023 PEP data; year column gives 2020-2023 directly
+    pep_2020_2023 <- get_estimates(geography = "county",
+                                   product = "characteristics",
+                                   breakdown = "AGEGROUP",
+                                   breakdown_labels = TRUE,
+                                   state = "WA",
+                                   time_series = TRUE,
+                                   vintage = 2023)
 
-  # ACS variables needed to compute 12+ age share
-  # verify codes with: load_variables(2023, "acs5") %>% filter(str_detect(name, "B01001_0"))
-  age_vars <- c(total = "B01001_001",
-                male_under5 = "B01001_003",
-                male_5to9 = "B01001_004",
-                male_10to14 = "B01001_005",
-                female_under5 = "B01001_027",
-                female_5to9 = "B01001_028",
-                female_10to14 = "B01001_029")
-
-  pull_acs_age_share <- function(year) {
-
-          get_acs(geography = "county",
-                  state = "WA",
-                  variables = age_vars,
-                  year = year,
-                  survey = "acs5",
-                  output = "wide") %>%
-            mutate(year = year) %>%
-            rename(county = NAME) %>%
-            mutate(county = str_remove(county, " County, Washington"),
-                   county = str_to_lower(county)) %>%
-            # compute 12+ share; subtract under-5, 5-9, and 2/5 of 10-14
-            # (assumes uniform age distribution within 10-14 bin for ages 10-11)
-            mutate(pop_under12 = (male_under5E + male_5to9E + (2/5)*male_10to14E) +
-                                 (female_under5E + female_5to9E + (2/5)*female_10to14E),
-                   share_12plus = (totalE - pop_under12) / totalE) %>%
-            select(year,
-                   county,
-                   share_12plus)
-
-  }
-
-  acs_age_share <- map_dfr(2017:2023, pull_acs_age_share)
-
-  # apply ACS 12+ share to OFM yearly totals; overwrite pop to match NSDUH 12+ universe
-  WA_county_pop_processed <- WA_county_pop_processed %>%
-                                left_join(acs_age_share,
-                                          by = c("year", "county")) %>%
-                                mutate(pop = round(pop * share_12plus)) %>%
-                                select(county, year, pop)
+    # combine vintages, compute 12+ population, clean county names
+    WA_county_pop_processed <- bind_rows(pep_2017_2019, pep_2020_2023) %>%
+      filter(AGEGROUP %in% c("All ages", "Age 0 to 4 years",
+                              "Age 5 to 9 years", "Age 10 to 14 years")) %>%
+      mutate(county = str_remove(NAME, " County, Washington"),
+             county = str_to_lower(county)) %>%
+      select(county, year, AGEGROUP, value) %>%
+      pivot_wider(names_from = AGEGROUP, values_from = value) %>%
+      mutate(pop = round(`All ages` - `Age 0 to 4 years` - `Age 5 to 9 years` -
+                           (2/5) * `Age 10 to 14 years`)) %>%
+      select(county, year, pop)
 
 # outcome variables: 3 outcomes (pmp, death, OUD), 6 years (2017-2022), 39 counties
 # source: confidential data; pulled by Dave Kline Jan 2025
