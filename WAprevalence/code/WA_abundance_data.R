@@ -51,26 +51,43 @@ library(tidycensus) # pull pop data from US Census
 
 # PREPARE OUTCOME VARIABLES 
 
-# load county level population estimates from the WA state office of financial management (OFM); available from 2010-2022
-# source: https://ofm.wa.gov/washington-data-research/population-demographics/population-estimates/small-area-estimates-program
+  # load county-level population estimates aged 12+ from Census Population Estimates Program
+  # source: US Census Bureau PEP via tidycensus
+  # approach: subtract under-12 pop from total, assuming uniformity within 10-14 age bin for ages 10-11
 
-  # import raw data
-  WA_county_pop_raw <- read.csv("WAprevalence/data/population/saep_county20.csv")
-  # process raw data
-  WA_county_pop_processed <- WA_county_pop_raw %>%
-                                slice(1:39) %>%
-                                select(1, 4:13, 15:19) %>%
-                                rename(county = `County.Name`) %>%
-                                pivot_longer(cols = 2:16,
-                                             names_to = c("year"),
-                                             values_to = c("pop")) %>%
-                                mutate(pop = str_remove_all(pop, ","),
-                                       year = str_remove(year, "Estimated.Total.Population."),
-                                       year = str_remove(year, "OFM.Adjusted.Total.Population.")) %>%
-                                mutate(across(c(year, pop),
-                                              as.numeric)) %>%
-                                mutate(county = str_to_lower(county)) %>%
-                                filter(year %in% 2017:2023)
+    # pull vintage 2019 PEP data; DATE codes 10-12 = July 1 estimates for 2017-2019
+    # source: https://www.census.gov/data/developers/data-sets/popest-popproj/popest/popest-vars/2019.html
+    pep_2017_2019 <- get_estimates(geography = "county",
+                                   product = "characteristics",
+                                   breakdown = "AGEGROUP",
+                                   breakdown_labels = TRUE,
+                                   state = "WA",
+                                   time_series = TRUE,
+                                   vintage = 2019) %>%
+      filter(DATE %in% 10:12) %>%
+      mutate(year = DATE - 10 + 2017) %>%
+      select(-DATE)
+
+    # pull vintage 2023 PEP data; year column gives 2020-2023 directly
+    pep_2020_2023 <- get_estimates(geography = "county",
+                                   product = "characteristics",
+                                   breakdown = "AGEGROUP",
+                                   breakdown_labels = TRUE,
+                                   state = "WA",
+                                   time_series = TRUE,
+                                   vintage = 2023)
+
+    # combine vintages, compute 12+ population, clean county names
+    WA_county_pop_processed <- bind_rows(pep_2017_2019, pep_2020_2023) %>%
+      filter(AGEGROUP %in% c("All ages", "Age 0 to 4 years",
+                              "Age 5 to 9 years", "Age 10 to 14 years")) %>%
+      mutate(county = str_remove(NAME, " County, Washington"),
+             county = str_to_lower(county)) %>%
+      select(county, year, AGEGROUP, value) %>%
+      pivot_wider(names_from = AGEGROUP, values_from = value) %>%
+      mutate(pop = round(`All ages` - `Age 0 to 4 years` - `Age 5 to 9 years` -
+                           (2/5) * `Age 10 to 14 years`)) %>%
+      select(county, year, pop)
 
 # outcome variables: 3 outcomes (pmp, death, OUD), 6 years (2017-2022), 39 counties
 # source: confidential data; pulled by Dave Kline Jan 2025
@@ -136,7 +153,7 @@ library(tidycensus) # pull pop data from US Census
             arrange(year, county)
   
   # check that there is no missing data in marginal outcomes; for ed and hospitalization counts <5 are censored; account for this in the model
-  apply(outcomes_processed[, c("pmp", "death", "ed", "hosp")], 2, function(x) sum(is.na(x))) == c(0, 0)
+  apply(outcomes_processed[, c("pmp", "death", "ed", "hosp")], 2, function(x) sum(is.na(x))) == c(0, 0, 0, 0)
   # check that all counties-years are present; 6 years x 39 counties = 234 rows
   nrow(outcomes_processed) == 7*39
 
