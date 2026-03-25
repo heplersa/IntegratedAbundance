@@ -19,7 +19,7 @@ library(tidycensus) # pull pop data from US Census
   # save(shape_county_WA, file = "WAprevalence/data/shape_county_WA.Rda")
   load("WAprevalence/data/shape_county_WA.Rda")
   
-  # compute adjacency matrix for NC counties
+  # compute adjacency matrix for WA counties
   WA_map <- shape_county_WA[order(shape_county_WA$COUNTYFP),] #convert to data frame
   
   nbmat <- poly2nb(WA_map)
@@ -89,7 +89,7 @@ library(tidycensus) # pull pop data from US Census
                            (2/5) * `Age 10 to 14 years`)) %>%
       select(county, year, pop)
 
-# outcome variables: 3 outcomes (pmp, death, OUD), 6 years (2017-2022), 39 counties
+# outcome variables: 4 outcomes (pmp, death, ED visit, hospitalization), 7 years (2017-2023), 39 counties
 # source: confidential data; pulled by Dave Kline Jan 2025
   
   # import raw data
@@ -222,16 +222,15 @@ library(tidycensus) # pull pop data from US Census
   # modeling data from 2017 - 2023
   T0 <- 2017 
 
-  # compute linear (ell.rate) and quadratic (ell.rate2) factors for the mean in the normal model
-  ell.lb <- c(2016,2017,2018,2021, 2022)
-  ell.ub <- c(2017,2018,2019,2022, 2023)
+  # compute slope (ell.rate) for the mean in the normal model
+  ell.lb <- c(2016, 2017, 2018, 2021, 2022)
+  ell.ub <- c(2017, 2018, 2019, 2022, 2023)
   ell.lb <- ell.lb - T0 + 1
   ell.ub <- ell.ub - T0 + 1
   ell.rate <- (ell.ub + ell.lb)/2
-  ell.rate2 <- (ell.ub*(ell.ub + 1)*(2*ell.ub + 1) - ell.lb*(ell.lb - 1)*(2*ell.lb - 1))/(6*(ell.ub - ell.lb + 1))
 
 # SAVE PREPARED DATA FOR USE IN NIMBLE MODEL
 save(adj, num,
      yfit,
-     S, S.se, logit_S, logit_S.se, ell.rate, ell.rate2,
+     S, S.se, logit_S, logit_S.se, ell.rate,
      file = "WAprevalence/data/data_for_analysis.Rda")

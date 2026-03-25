@@ -58,51 +58,94 @@ model_code <- nimbleCode({
     }
     
     # mean state-wide average risk of misuse in year t
-    mu[t] <- ilogit(beta.mu[1] + beta.mu[2]*t + beta.mu[3]*t^2)
+    mu[t] <- ilogit(beta.mu[1] + beta.mu[2]*t)
     
   }
   
-  for(t in 2:T){ # remaining years (for outcomes with data available over whole study period)
-    
+  for(t in 2:(T-1)){ # years 2 through T-1
+
     for(i in 1:R){ # counties
-      
+
       for(j in 1:2){ # outcomes (each patient contributes only one count)
-        
+
         y[(t-1)*R+i,j] ~ dbinom(pi[(t-1)*R+i,j], N[(t-1)*R+i])
         mu.f[(t-1)*R+i,j] <- phi.f[j]*f[(t-2)*R+i, j]
-        
+
       }
-      
+
       # outcomes (each patient can contribute more than one count)
-        
+
         # hospitalization outcome has data for all years so no need to shift time-index
         y[(t-1)*R+i,4] ~ dpois(pi[(t-1)*R+i,4]*N[(t-1)*R+i])
         mu.f[(t-1)*R+i,4] <- phi.f[4]*f[(t-2)*R+i, 4]
-        
+
         # poisson outcomes are censored in [1,9]
         censored_hosp[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,4], c_hosp[(t-1)*R+i, 1:2])
-      
+
       # outcome error term
       eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], cov = cov.eps[1:K, 1:K])
-      
+
       # logistic link for binomial outcome(s)
       pi[(t-1)*R+i,1] <- ilogit(beta[t,1] + (f[(t-1)*R+i,1] + mu.f[(t-1)*R+i,1]) + eps[(t-1)*R+i,1])
       pi[(t-1)*R+i,2] <- ilogit(beta[t,2] + (f[(t-1)*R+i,2] + mu.f[(t-1)*R+i,2]) + eps[(t-1)*R+i,2])
-      
+
       # log link for poisson outcome(s)
       pi[(t-1)*R+i,4] <- exp(beta[t,4] + (f[(t-1)*R+i,4] + mu.f[(t-1)*R+i,4]) + eps[(t-1)*R+i,4])
 
       # latent counts (process model)
-      mu.u[(t-1)*R+i] <- phi.u*u[(t-2)*R+i] 
+      mu.u[(t-1)*R+i] <- phi.u*u[(t-2)*R+i]
       lambda[(t-1)*R+i] <- exp((u[(t-1)*R+i] + mu.u[(t-1)*R+i]) + v[(t-1)*R+i])
       N[(t-1)*R+i] ~ dbinom(mu[t]*lambda[(t-1)*R+i], P[(t-1)*R+i])
       v[(t-1)*R+i] ~ dnorm(0, tau.v)
-      
+
     }
-    
+
     # mean state-wide risk of misuse in year t
-    mu[t] <- ilogit(beta.mu[1] + beta.mu[2]*t + beta.mu[3]*t^2)
-    
+    mu[t] <- ilogit(beta.mu[1] + beta.mu[2]*t)
+
+  }
+
+  for(t in T:T){ # last year: constrain mu[T] = mu[T-1]
+
+    for(i in 1:R){ # counties
+
+      for(j in 1:2){ # outcomes (each patient contributes only one count)
+
+        y[(t-1)*R+i,j] ~ dbinom(pi[(t-1)*R+i,j], N[(t-1)*R+i])
+        mu.f[(t-1)*R+i,j] <- phi.f[j]*f[(t-2)*R+i, j]
+
+      }
+
+      # outcomes (each patient can contribute more than one count)
+
+        # hospitalization outcome has data for all years so no need to shift time-index
+        y[(t-1)*R+i,4] ~ dpois(pi[(t-1)*R+i,4]*N[(t-1)*R+i])
+        mu.f[(t-1)*R+i,4] <- phi.f[4]*f[(t-2)*R+i, 4]
+
+        # poisson outcomes are censored in [1,9]
+        censored_hosp[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,4], c_hosp[(t-1)*R+i, 1:2])
+
+      # outcome error term
+      eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], cov = cov.eps[1:K, 1:K])
+
+      # logistic link for binomial outcome(s)
+      pi[(t-1)*R+i,1] <- ilogit(beta[t,1] + (f[(t-1)*R+i,1] + mu.f[(t-1)*R+i,1]) + eps[(t-1)*R+i,1])
+      pi[(t-1)*R+i,2] <- ilogit(beta[t,2] + (f[(t-1)*R+i,2] + mu.f[(t-1)*R+i,2]) + eps[(t-1)*R+i,2])
+
+      # log link for poisson outcome(s)
+      pi[(t-1)*R+i,4] <- exp(beta[t,4] + (f[(t-1)*R+i,4] + mu.f[(t-1)*R+i,4]) + eps[(t-1)*R+i,4])
+
+      # latent counts (process model)
+      mu.u[(t-1)*R+i] <- phi.u*u[(t-2)*R+i]
+      lambda[(t-1)*R+i] <- exp((u[(t-1)*R+i] + mu.u[(t-1)*R+i]) + v[(t-1)*R+i])
+      N[(t-1)*R+i] ~ dbinom(mu[t]*lambda[(t-1)*R+i], P[(t-1)*R+i])
+      v[(t-1)*R+i] ~ dnorm(0, tau.v)
+
+    }
+
+    # mean state-wide risk of misuse held constant in last year
+    mu[t] <- mu[t-1]
+
   }
   
   for(t in 2:(T-2)){ # remaining years (for outcomes with data missing for 2018-2019)
@@ -126,11 +169,14 @@ model_code <- nimbleCode({
   }
   
   # state-wide survey data model
-  for(l in 1:L){
-    
-    S[l] ~ dnorm(beta.mu[1]+beta.mu[2]*ell.rate[l] + beta.mu[3]*ell.rate2[l], sd=S.se[l])
-    
+  for(l in 1:(L-1)){
+
+    S[l] ~ dnorm(beta.mu[1]+beta.mu[2]*ell.rate[l], sd=S.se[l])
+
   }
+
+  # last survey spans T-1 to T; mu constant so effective midpoint is T-1
+  S[L] ~ dnorm(beta.mu[1]+beta.mu[2]*(T-1), sd=S.se[L])
   
   # spatial random effects for data level
   
@@ -195,7 +241,7 @@ model_code <- nimbleCode({
     
   }
   
-  beta.mu[1:3] ~ dmnorm(mean = mean.mu[1:3], cov = cov.mu[1:3, 1:3])
+  beta.mu[1:2] ~ dmnorm(mean = mean.mu[1:2], cov = cov.mu[1:2, 1:2])
   
   cov.eps[1:K, 1:K] ~ dwish(R=cov.eps.R[1:K, 1:K], df=K)
   
@@ -234,13 +280,12 @@ mod_constants <- list(R = n,
                       K = K,
                       L = length(ell.rate),
                       ell.rate = ell.rate,
-                      ell.rate2 = ell.rate2,
                       P = yfit$pop,
                       num = num,
                       adj = adj, 
                       S.se = logit_S.se,
-                      mean.mu = rep(0, 3),
-                      cov.mu = 10^4*diag(3),
+                      mean.mu = rep(0, 2),
+                      cov.mu = 10^4*diag(2),
                       mean.eps = rep(0, K),
                       cov.eps.R = diag(K),
                       c_ed = c_ed,
@@ -254,7 +299,7 @@ mod_data <- list(y=as.matrix(yfit[,c("pmp", "death", "ed", "hosp")]),
 )
 
 # specify initial values
-logit_beta.mu.init <- lm(logit_S~ell.rate + ell.rate2)$coefficients
+logit_beta.mu.init <- lm(logit_S~ell.rate)$coefficients
 beta.init <- matrix(data = 0, nrow = T, ncol = K)
 Ninit <- floor(yfit$pop*ilogit(logit_beta.mu.init[1]))
 finit <- matrix(data = 0, nrow = n*T, ncol = K)
@@ -392,4 +437,4 @@ samples <- runMCMC(compiled_mcmc,
                    setSeed = 2) 
 
 Sys.time()-st
-save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_2026_02_09.Rda")
+save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_2026_03_24.Rda")
