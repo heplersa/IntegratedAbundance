@@ -437,4 +437,4 @@ samples <- runMCMC(compiled_mcmc,
                    setSeed = 2) 
 
 Sys.time()-st
-save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_2026_03_24.Rda")
+save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_N_pois_2026_06_19.Rda")
