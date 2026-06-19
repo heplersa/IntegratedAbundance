@@ -38,7 +38,7 @@ model_code <- nimbleCode({
         censored_hosp[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,4], c_hosp[(t-1)*R+i, 1:2])
       
       # outcome error term
-      eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], cov = cov.eps[1:K, 1:K])
+      #eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], cov = cov.eps[1:K, 1:K])
       
       # logistic link for binomial outcome(s)
       pi[(t-1)*R+i,1] <- ilogit(beta[t,1] + (f[(t-1)*R+i,1] + mu.f[(t-1)*R+i,1]) + eps[(t-1)*R+i,1])
@@ -83,7 +83,7 @@ model_code <- nimbleCode({
         censored_hosp[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,4], c_hosp[(t-1)*R+i, 1:2])
 
       # outcome error term
-      eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], cov = cov.eps[1:K, 1:K])
+      #eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], cov = cov.eps[1:K, 1:K])
 
       # logistic link for binomial outcome(s)
       pi[(t-1)*R+i,1] <- ilogit(beta[t,1] + (f[(t-1)*R+i,1] + mu.f[(t-1)*R+i,1]) + eps[(t-1)*R+i,1])
@@ -126,7 +126,7 @@ model_code <- nimbleCode({
         censored_hosp[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,4], c_hosp[(t-1)*R+i, 1:2])
 
       # outcome error term
-      eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], cov = cov.eps[1:K, 1:K])
+      #eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], cov = cov.eps[1:K, 1:K])
 
       # logistic link for binomial outcome(s)
       pi[(t-1)*R+i,1] <- ilogit(beta[t,1] + (f[(t-1)*R+i,1] + mu.f[(t-1)*R+i,1]) + eps[(t-1)*R+i,1])
@@ -166,6 +166,19 @@ model_code <- nimbleCode({
       
     }
     
+  }
+  
+  # outcome-level error term
+  for(t in 1:T){
+    for(i in 1:R){
+      eps_raw[(t-1)*R+i, 1:K] ~ dmnorm(mean.eps[1:K], cov = cov.eps[1:K, 1:K])
+    }
+    for(j in 1:K){
+      eps_bar[t, j] <- sum(eps_raw[((t-1)*R+1):((t-1)*R+R), j])/R
+      for(i in 1:R){
+        eps[(t-1)*R+i, j] <- eps_raw[(t-1)*R+i, j] - eps_bar[t, j]
+      }
+    }
   }
   
   # state-wide survey data model
@@ -218,13 +231,21 @@ model_code <- nimbleCode({
   
     # outcomes with data over whole study period
     for(j in c(1,2,4)){
+      
+      for(t in 1:T) {
           
-          beta[1:T, j] ~ dmnorm(mean.beta[1:T], cov=cov.beta[1:T, 1:T]) 
+          beta[t, j] ~ dflat()
           
-        }
+      }
+      
+    }
       
     # outcome (ED visits) without data over whole study period
-    beta[3:T, 3] ~ dmnorm(mean.beta[3:T], cov=cov.beta[3:T, 3:T]) 
+    for(t in 3:T){
+      
+      beta[t, 3] ~ dflat()
+      
+    }
 
   
   for(j in 1:K){
@@ -281,8 +302,6 @@ mod_constants <- list(R = n,
                       cov.mu = 10^4*diag(2),
                       mean.eps = rep(0, K),
                       cov.eps.R = diag(K),
-                      mean.beta = rep(0,T),
-                      cov.beta = diag(100, T),
                       c_ed = c_ed,
                       c_hosp = c_hosp
 )
@@ -345,6 +364,7 @@ if(length(II) > 0){
 mod_inits <- list(y = as.matrix(yinit),
                   N = Ninit,
                   beta = beta.init,
+                  eps_raw = matrix(0, n*T, K),
                   cov.eps = diag(K),
                   tau.v = .1, 
                   u = uinit,
@@ -416,7 +436,7 @@ compiled_mcmc <- compileNimble(nimble_mcmc, project = nimble_model, resetFunctio
 
 # Run the model 
 set.seed(2025)
-MCS <- 1*10^6
+MCS <- 3*10^4
 st  <- Sys.time()
 samples <- runMCMC(compiled_mcmc,
                    inits = mod_inits,
@@ -431,4 +451,4 @@ samples <- runMCMC(compiled_mcmc,
                    setSeed = 2) 
 
 Sys.time()-st
-save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_N_pois_2026_06_19.Rda")
+save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_N_pois_beta_MVN_2026_06_19.Rda")
