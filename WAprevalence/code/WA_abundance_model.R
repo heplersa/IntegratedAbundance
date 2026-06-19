@@ -51,7 +51,7 @@ model_code <- nimbleCode({
       # latent counts (process model)
       mu.u[(t-1)*R+i] <- 0
       lambda[(t-1)*R+i] <- exp((u[(t-1)*R+i] + mu.u[(t-1)*R+i]) + v[(t-1)*R+i])
-      N[(t-1)*R+i] ~ dbinom(mu[t]*lambda[(t-1)*R+i],P[(t-1)*R+i])
+      N[(t-1)*R+i] ~ dpois(mu[t]*lambda[(t-1)*R+i]*P[(t-1)*R+i])
       v[(t-1)*R+i] ~ dnorm(0,tau.v)
       
       
@@ -95,7 +95,7 @@ model_code <- nimbleCode({
       # latent counts (process model)
       mu.u[(t-1)*R+i] <- phi.u*u[(t-2)*R+i]
       lambda[(t-1)*R+i] <- exp((u[(t-1)*R+i] + mu.u[(t-1)*R+i]) + v[(t-1)*R+i])
-      N[(t-1)*R+i] ~ dbinom(mu[t]*lambda[(t-1)*R+i], P[(t-1)*R+i])
+      N[(t-1)*R+i] ~ dpois(mu[t]*lambda[(t-1)*R+i]*P[(t-1)*R+i])
       v[(t-1)*R+i] ~ dnorm(0, tau.v)
 
     }
@@ -138,7 +138,7 @@ model_code <- nimbleCode({
       # latent counts (process model)
       mu.u[(t-1)*R+i] <- phi.u*u[(t-2)*R+i]
       lambda[(t-1)*R+i] <- exp((u[(t-1)*R+i] + mu.u[(t-1)*R+i]) + v[(t-1)*R+i])
-      N[(t-1)*R+i] ~ dbinom(mu[t]*lambda[(t-1)*R+i], P[(t-1)*R+i])
+      N[(t-1)*R+i] ~ dpois(mu[t]*lambda[(t-1)*R+i]*P[(t-1)*R+i])
       v[(t-1)*R+i] ~ dnorm(0, tau.v)
 
     }
