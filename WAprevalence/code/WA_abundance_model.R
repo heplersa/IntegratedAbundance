@@ -218,21 +218,14 @@ model_code <- nimbleCode({
   
     # outcomes with data over whole study period
     for(j in c(1,2,4)){
-      
-      for(t in 1:T){
-        
-        beta[t, j] ~ dflat() 
-        
-      }
-      
-    }
-      
-    # outcome (ED visits) without data over whole study period
-       for(t in 3:T){
           
-          beta[t, 3] ~ dflat() 
+          beta[1:T, j] ~ dmnorm(rep(0,T), cov=diag(100,t)) 
           
         }
+      
+    # outcome (ED visits) without data over whole study period
+    beta[3:T, 3] ~ dmnorm(rep(0,T-2), cov=diag(100,t)) 
+
   
   for(j in 1:K){
     
@@ -414,7 +407,6 @@ for(i in 1:n){
                                     maxContractions=1000000)
   )
 }
-
 
 nimble_mcmc <- buildMCMC(mcmc_conf)
 compiled_mcmc <- compileNimble(nimble_mcmc, project = nimble_model, resetFunctions = TRUE)
