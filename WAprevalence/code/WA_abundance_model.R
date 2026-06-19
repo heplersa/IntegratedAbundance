@@ -219,12 +219,12 @@ model_code <- nimbleCode({
     # outcomes with data over whole study period
     for(j in c(1,2,4)){
           
-          beta[1:T, j] ~ dmnorm(rep(0,T), cov=diag(100,t)) 
+          beta[1:T, j] ~ dmnorm(mean.beta[1:T], cov=cov.beta[1:T, 1:T]) 
           
         }
       
     # outcome (ED visits) without data over whole study period
-    beta[3:T, 3] ~ dmnorm(rep(0,T-2), cov=diag(100,t)) 
+    beta[3:T, 3] ~ dmnorm(mean.beta[3:T], cov=cov.beta[3:T, 3:T]) 
 
   
   for(j in 1:K){
@@ -281,6 +281,8 @@ mod_constants <- list(R = n,
                       cov.mu = 10^4*diag(2),
                       mean.eps = rep(0, K),
                       cov.eps.R = diag(K),
+                      mean.beta = rep(0,T),
+                      cov.beta = diag(100, T),
                       c_ed = c_ed,
                       c_hosp = c_hosp
 )
