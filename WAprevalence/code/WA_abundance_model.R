@@ -343,13 +343,27 @@ II <- which(Ninit < yfit[,"hosp"])
 if(length(II) > 0){
   
   Ninit[II] <- yfit[II,"hosp"] + 100
-  
+
 }
+
+# data-implied inits for the time-varying intercepts (log/logit of mean count / mean N);
+# starting at 0 puts the poisson means ~N, orders of magnitude too high
+meanN <- mean(Ninit)
+hosp_c <- ifelse(is.na(yfit$hosp), 3, yfit$hosp) # censored counts in [1,9]: rough midpoint
+ed_c <- ifelse(is.na(yfit$ed), 3, yfit$ed)
+beta.init[, 4] <- log(mean(hosp_c, na.rm = TRUE) / meanN) # hosp (poisson)
+beta.init[3:T, 3] <- log(mean(ed_c, na.rm = TRUE) / meanN) # ed (poisson, t >= 3)
+beta.init[, 1] <- qlogis(pmin(pmax(mean(yfit$pmp, na.rm = TRUE) / meanN, 1e-4), 0.99)) # pmp (binomial)
+beta.init[, 2] <- qlogis(pmin(pmax(mean(yfit$death, na.rm = TRUE) / meanN, 1e-5), 0.99)) # death (binomial)
+
+# initialize eps explicitly (previously unset, so nimble simulated it)
+epsinit <- matrix(0, nrow = n*T, ncol = K)
 
 # set initial values.
 mod_inits <- list(y = as.matrix(yinit),
                   N = Ninit,
                   beta = beta.init,
+                  eps = epsinit,
                   cov.eps = diag(K),
                   tau.v = .1, 
                   u = uinit,
@@ -365,6 +379,18 @@ nimble_model <- nimbleModel(model_code,
                             mod_constants,
                             mod_data,
                             mod_inits)
+
+# init sanity check: confirm a finite operating point and name any cliff
+init_nodes <- nimble_model$getNodeNames(stochOnly = TRUE, includeData = TRUE)
+init_lp    <- sapply(init_nodes, function(nd) nimble_model$calculate(nd))
+cat("Total logProb at init:", sum(init_lp), "\n")
+bad_nodes  <- init_nodes[!is.finite(init_lp)]
+if (length(bad_nodes) > 0) {
+  cat("NON-FINITE nodes at init (", length(bad_nodes), "):\n", sep = "")
+  print(head(bad_nodes, 50L))
+} else {
+  cat("All stochastic/data nodes finite at init.\n")
+}
 
 compiled_model <- compileNimble(nimble_model,
                                 resetFunctions = TRUE)
@@ -417,18 +443,21 @@ for(i in 1:n){
 
 
 # change to RW_block for correlated time-varying intercepts beta
+# small initial scale; RW_block adapts the proposal covariance over burn-in
 
   # outcomes 1, 2, 4 with complete temporal record
   for(col in c(1, 2, 4)) {
     beta_nodes <- paste0("beta[1:", T, ", ", col, "]")
     mcmc_conf$removeSamplers(beta_nodes)
-    mcmc_conf$addSampler(target = beta_nodes, type = "RW_block")
+    mcmc_conf$addSampler(target = beta_nodes, type = "RW_block",
+                         control = list(scale = 0.1))
   }
-  
+
   # outcome 3 (ED visits) with missing data for first two years in record
   beta_nodes_3 <- paste0("beta[3:", T, ", 3]")
   mcmc_conf$removeSamplers(beta_nodes_3)
-  mcmc_conf$addSampler(target = beta_nodes_3, type = "RW_block")
+  mcmc_conf$addSampler(target = beta_nodes_3, type = "RW_block",
+                       control = list(scale = 0.1))
 
 
 nimble_mcmc <- buildMCMC(mcmc_conf)
