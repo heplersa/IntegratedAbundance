@@ -442,22 +442,19 @@ for(i in 1:n){
 }
 
 
-# change to RW_block for correlated time-varying intercepts beta
-# small initial scale; RW_block adapts the proposal covariance over burn-in
+# ridge-spanning block: beta.mu + all time-varying intercepts in one RW_block,
+# proposal covariance seeded from the previous run so proposals move along the ridge
+prev <- local({
+  load("WAprevalence/output/mcmc/MCMC_no_covariates_N_pois_RW_block_beta_2026_06_20.Rda")
+  samples
+})
+ridge_target  <- c("beta.mu", "beta")
+ridge_scalars <- nimble_model$expandNodeNames(ridge_target, returnScalarComponents = TRUE)
+propCov_seed  <- cov(as.matrix(prev)[, ridge_scalars])
 
-  # outcomes 1, 2, 4 with complete temporal record
-  for(col in c(1, 2, 4)) {
-    beta_nodes <- paste0("beta[1:", T, ", ", col, "]")
-    mcmc_conf$removeSamplers(beta_nodes)
-    mcmc_conf$addSampler(target = beta_nodes, type = "RW_block",
-                         control = list(scale = 0.1))
-  }
-
-  # outcome 3 (ED visits) with missing data for first two years in record
-  beta_nodes_3 <- paste0("beta[3:", T, ", 3]")
-  mcmc_conf$removeSamplers(beta_nodes_3)
-  mcmc_conf$addSampler(target = beta_nodes_3, type = "RW_block",
-                       control = list(scale = 0.1))
+mcmc_conf$removeSamplers(ridge_target)
+mcmc_conf$addSampler(target = ridge_target, type = "RW_block",
+                     control = list(propCov = propCov_seed, adaptInterval = 100))
 
 
 nimble_mcmc <- buildMCMC(mcmc_conf)
@@ -481,4 +478,4 @@ samples <- runMCMC(compiled_mcmc,
                    setSeed = 2) 
 
 Sys.time()-st
-save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_N_pois_RW_block_beta_2026_06_20.Rda")
+save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_N_pois_ridge_block_2026_06_20.Rda")
