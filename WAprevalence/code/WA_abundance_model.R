@@ -416,13 +416,28 @@ for(i in 1:n){
 }
 
 
+# change to RW_block for correlated time-varying intercepts beta
+
+  # outcomes 1, 2, 4 with complete temporal record
+  for(col in c(1, 2, 4)) {
+    beta_nodes <- paste0("beta[1:", T, ", ", col, "]")
+    mcmc_conf$removeSamplers(beta_nodes)
+    mcmc_conf$addSampler(target = beta_nodes, type = "RW_block")
+  }
+  
+  # outcome 3 (ED visits) with missing data for first two years in record
+  beta_nodes_3 <- paste0("beta[3:", T, ", 3]")
+  mcmc_conf$removeSamplers(beta_nodes_3)
+  mcmc_conf$addSampler(target = beta_nodes_3, type = "RW_block")
+
+
 nimble_mcmc <- buildMCMC(mcmc_conf)
 compiled_mcmc <- compileNimble(nimble_mcmc, project = nimble_model, resetFunctions = TRUE)
 
 
 # Run the model 
 set.seed(2025)
-MCS <- 1*10^6
+MCS <- 1*10^5
 st  <- Sys.time()
 samples <- runMCMC(compiled_mcmc,
                    inits = mod_inits,
@@ -437,4 +452,4 @@ samples <- runMCMC(compiled_mcmc,
                    setSeed = 2) 
 
 Sys.time()-st
-save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_2026_03_24.Rda")
+save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_N_pois_RW_block_beta_2026_06_20.Rda")
