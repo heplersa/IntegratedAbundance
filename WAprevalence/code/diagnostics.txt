@@ -1,0 +1,148 @@
+> # across-time correlation of beta, within each outcome
+> cat("\n== across-time corr of beta (per outcome) ==\n")
+
+== across-time corr of beta (per outcome) ==
+> for(j in c(1,2,4)){ cat("outcome", j, "\n"); print(round(cor(sm[, paste0("beta[", 1:T, ", ", j, "]")]), 2)) }
+outcome 1 
+           beta[1, 1] beta[2, 1] beta[3, 1] beta[4, 1] beta[5, 1] beta[6, 1] beta[7, 1]
+beta[1, 1]       1.00       0.11       0.33       0.66       0.54       0.58       0.68
+beta[2, 1]       0.11       1.00       0.41       0.09       0.11       0.04       0.26
+beta[3, 1]       0.33       0.41       1.00       0.38       0.38       0.41       0.59
+beta[4, 1]       0.66       0.09       0.38       1.00       0.78       0.81       0.75
+beta[5, 1]       0.54       0.11       0.38       0.78       1.00       0.79       0.71
+beta[6, 1]       0.58       0.04       0.41       0.81       0.79       1.00       0.82
+beta[7, 1]       0.68       0.26       0.59       0.75       0.71       0.82       1.00
+outcome 2 
+           beta[1, 2] beta[2, 2] beta[3, 2] beta[4, 2] beta[5, 2] beta[6, 2] beta[7, 2]
+beta[1, 2]       1.00       0.28       0.23       0.50       0.43       0.40       0.45
+beta[2, 2]       0.28       1.00       0.18       0.25       0.19       0.23       0.26
+beta[3, 2]       0.23       0.18       1.00       0.48       0.47       0.46       0.49
+beta[4, 2]       0.50       0.25       0.48       1.00       0.64       0.66       0.64
+beta[5, 2]       0.43       0.19       0.47       0.64       1.00       0.66       0.66
+beta[6, 2]       0.40       0.23       0.46       0.66       0.66       1.00       0.74
+beta[7, 2]       0.45       0.26       0.49       0.64       0.66       0.74       1.00
+outcome 4 
+           beta[1, 4] beta[2, 4] beta[3, 4] beta[4, 4] beta[5, 4] beta[6, 4] beta[7, 4]
+beta[1, 4]       1.00       0.29       0.19       0.50       0.41       0.40       0.42
+beta[2, 4]       0.29       1.00       0.28       0.26       0.32       0.27       0.28
+beta[3, 4]       0.19       0.28       1.00       0.44       0.46       0.50       0.45
+beta[4, 4]       0.50       0.26       0.44       1.00       0.60       0.63       0.59
+beta[5, 4]       0.41       0.32       0.46       0.60       1.00       0.63       0.53
+beta[6, 4]       0.40       0.27       0.50       0.63       0.63       1.00       0.69
+beta[7, 4]       0.42       0.28       0.45       0.59       0.53       0.69       1.00
+> cat("outcome 3\n"); print(round(cor(sm[, paste0("beta[", 3:T, ", 3]")]), 2))
+outcome 3
+           beta[3, 3] beta[4, 3] beta[5, 3] beta[6, 3] beta[7, 3]
+beta[3, 3]       1.00       0.42       0.43       0.41       0.45
+beta[4, 3]       0.42       1.00       0.56       0.50       0.48
+beta[5, 3]       0.43       0.56       1.00       0.60       0.56
+beta[6, 3]       0.41       0.50       0.60       1.00       0.70
+beta[7, 3]       0.45       0.48       0.56       0.70       1.00
+> 
+> # across-outcome correlation of beta, within each year
+> cat("\n== across-outcome corr of beta (per year) ==\n")
+
+== across-outcome corr of beta (per year) ==
+> for(t in 1:T){
++   cols <- if(t >= 3) 1:4 else c(1,2,4)
++   cat("year", t, "\n"); print(round(cor(sm[, paste0("beta[", t, ", ", cols, "]")]), 2))
++ }
+year 1 
+           beta[1, 1] beta[1, 2] beta[1, 4]
+beta[1, 1]       1.00       0.70       0.78
+beta[1, 2]       0.70       1.00       0.67
+beta[1, 4]       0.78       0.67       1.00
+year 2 
+           beta[2, 1] beta[2, 2] beta[2, 4]
+beta[2, 1]       1.00       0.46       0.51
+beta[2, 2]       0.46       1.00       0.50
+beta[2, 4]       0.51       0.50       1.00
+year 3 
+           beta[3, 1] beta[3, 2] beta[3, 3] beta[3, 4]
+beta[3, 1]       1.00       0.64       0.63       0.71
+beta[3, 2]       0.64       1.00       0.60       0.63
+beta[3, 3]       0.63       0.60       1.00       0.65
+beta[3, 4]       0.71       0.63       0.65       1.00
+year 4 
+           beta[4, 1] beta[4, 2] beta[4, 3] beta[4, 4]
+beta[4, 1]       1.00       0.87       0.76       0.85
+beta[4, 2]       0.87       1.00       0.74       0.80
+beta[4, 3]       0.76       0.74       1.00       0.75
+beta[4, 4]       0.85       0.80       0.75       1.00
+year 5 
+           beta[5, 1] beta[5, 2] beta[5, 3] beta[5, 4]
+beta[5, 1]       1.00       0.82       0.76       0.82
+beta[5, 2]       0.82       1.00       0.77       0.77
+beta[5, 3]       0.76       0.77       1.00       0.74
+beta[5, 4]       0.82       0.77       0.74       1.00
+year 6 
+           beta[6, 1] beta[6, 2] beta[6, 3] beta[6, 4]
+beta[6, 1]       1.00       0.92       0.88       0.89
+beta[6, 2]       0.92       1.00       0.87       0.86
+beta[6, 3]       0.88       0.87       1.00       0.81
+beta[6, 4]       0.89       0.86       0.81       1.00
+year 7 
+           beta[7, 1] beta[7, 2] beta[7, 3] beta[7, 4]
+beta[7, 1]       1.00       0.90       0.86       0.89
+beta[7, 2]       0.90       1.00       0.81       0.82
+beta[7, 3]       0.86       0.81       1.00       0.82
+beta[7, 4]       0.89       0.82       0.82       1.00
+> 
+> # beta vs statewide mu and total N (detection/abundance ridge)
+> cat("\n== cor(beta, mu) and cor(beta, total N), by year ==\n")
+
+== cor(beta, mu) and cor(beta, total N), by year ==
+> for(t in 1:T){
++   Ntot <- rowSums(sm[, paste0("N[", (t-1)*R + 1:R, "]")])
++   cols <- if(t >= 3) 1:4 else c(1,2,4)
++   for(j in cols){
++     b <- sm[, paste0("beta[", t, ", ", j, "]")]
++     cat(sprintf("year %d outcome %d:  mu %5.2f   N %5.2f\n",
++                 t, j, cor(b, sm[, paste0("mu[", t, "]")]), cor(b, Ntot)))
++   }
++ }
+year 1 outcome 1:  mu -0.79   N -0.58
+year 1 outcome 2:  mu -0.67   N -0.57
+year 1 outcome 4:  mu -0.69   N -0.65
+year 2 outcome 1:  mu -0.28   N -0.02
+year 2 outcome 2:  mu -0.35   N -0.36
+year 2 outcome 4:  mu -0.42   N -0.44
+year 3 outcome 1:  mu -0.56   N -0.74
+year 3 outcome 2:  mu -0.57   N -0.67
+year 3 outcome 3:  mu -0.59   N -0.65
+year 3 outcome 4:  mu -0.57   N -0.67
+year 4 outcome 1:  mu -0.89   N -0.68
+year 4 outcome 2:  mu -0.80   N -0.67
+year 4 outcome 3:  mu -0.71   N -0.58
+year 4 outcome 4:  mu -0.78   N -0.66
+year 5 outcome 1:  mu -0.86   N -0.45
+year 5 outcome 2:  mu -0.79   N -0.49
+year 5 outcome 3:  mu -0.75   N -0.48
+year 5 outcome 4:  mu -0.75   N -0.52
+year 6 outcome 1:  mu -0.90   N -0.70
+year 6 outcome 2:  mu -0.85   N -0.72
+year 6 outcome 3:  mu -0.79   N -0.63
+year 6 outcome 4:  mu -0.85   N -0.71
+year 7 outcome 1:  mu -0.86   N -0.68
+year 7 outcome 2:  mu -0.81   N -0.70
+year 7 outcome 3:  mu -0.80   N -0.61
+year 7 outcome 4:  mu -0.76   N -0.66
+> 
+> # effective sample size
+> cat("\n== ESS: beta ==\n");    print(round(effectiveSize(samples[, grep("^beta\\[", colnames(sm))])))
+
+== ESS: beta ==
+beta[1, 1] beta[2, 1] beta[3, 1] beta[4, 1] beta[5, 1] beta[6, 1] beta[7, 1] beta[1, 2] beta[2, 2] beta[3, 2] beta[4, 2] beta[5, 2] beta[6, 2] beta[7, 2] beta[1, 3] beta[2, 3] beta[3, 3] 
+         9         18         12          3          4          2          4         23         74         29         10          6          6         10          0          0         31 
+beta[4, 3] beta[5, 3] beta[6, 3] beta[7, 3] beta[1, 4] beta[2, 4] beta[3, 4] beta[4, 4] beta[5, 4] beta[6, 4] beta[7, 4] 
+        16         14          7         11         15         33         19          8          8          6         11 
+> cat("\n== ESS: beta.mu ==\n"); print(round(effectiveSize(samples[, c("beta.mu[1]", "beta.mu[2]")])))
+
+== ESS: beta.mu ==
+beta.mu[1] beta.mu[2] 
+         2          5 
+> cat("\n== ESS: mu ==\n");      print(round(effectiveSize(samples[, grep("^mu\\[", colnames(sm))])))
+
+== ESS: mu ==
+mu[1] mu[2] mu[3] mu[4] mu[5] mu[6] mu[7] 
+    2     2     2     3     3     3     3 
