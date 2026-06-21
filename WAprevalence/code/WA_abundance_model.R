@@ -343,27 +343,13 @@ II <- which(Ninit < yfit[,"hosp"])
 if(length(II) > 0){
   
   Ninit[II] <- yfit[II,"hosp"] + 100
-
+  
 }
-
-# data-implied inits for the time-varying intercepts (log/logit of mean count / mean N);
-# starting at 0 puts the poisson means ~N, orders of magnitude too high
-meanN <- mean(Ninit)
-hosp_c <- ifelse(is.na(yfit$hosp), 3, yfit$hosp) # censored counts in [1,9]: rough midpoint
-ed_c <- ifelse(is.na(yfit$ed), 3, yfit$ed)
-beta.init[, 4] <- log(mean(hosp_c, na.rm = TRUE) / meanN) # hosp (poisson)
-beta.init[3:T, 3] <- log(mean(ed_c, na.rm = TRUE) / meanN) # ed (poisson, t >= 3)
-beta.init[, 1] <- qlogis(pmin(pmax(mean(yfit$pmp, na.rm = TRUE) / meanN, 1e-4), 0.99)) # pmp (binomial)
-beta.init[, 2] <- qlogis(pmin(pmax(mean(yfit$death, na.rm = TRUE) / meanN, 1e-5), 0.99)) # death (binomial)
-
-# initialize eps explicitly (previously unset, so nimble simulated it)
-epsinit <- matrix(0, nrow = n*T, ncol = K)
 
 # set initial values.
 mod_inits <- list(y = as.matrix(yinit),
                   N = Ninit,
                   beta = beta.init,
-                  eps = epsinit,
                   cov.eps = diag(K),
                   tau.v = .1, 
                   u = uinit,
@@ -379,18 +365,6 @@ nimble_model <- nimbleModel(model_code,
                             mod_constants,
                             mod_data,
                             mod_inits)
-
-# init sanity check: confirm a finite operating point and name any cliff
-init_nodes <- nimble_model$getNodeNames(stochOnly = TRUE, includeData = TRUE)
-init_lp    <- sapply(init_nodes, function(nd) nimble_model$calculate(nd))
-cat("Total logProb at init:", sum(init_lp), "\n")
-bad_nodes  <- init_nodes[!is.finite(init_lp)]
-if (length(bad_nodes) > 0) {
-  cat("NON-FINITE nodes at init (", length(bad_nodes), "):\n", sep = "")
-  print(head(bad_nodes, 50L))
-} else {
-  cat("All stochastic/data nodes finite at init.\n")
-}
 
 compiled_model <- compileNimble(nimble_model,
                                 resetFunctions = TRUE)
@@ -442,28 +416,13 @@ for(i in 1:n){
 }
 
 
-# ridge-spanning block: beta.mu + all time-varying intercepts in one RW_block,
-# proposal covariance seeded from the previous run so proposals move along the ridge
-prev <- local({
-  load("WAprevalence/output/mcmc/MCMC_no_covariates_N_pois_RW_block_beta_2026_06_20.Rda")
-  samples
-})
-ridge_target  <- c("beta.mu", "beta")
-ridge_scalars <- nimble_model$expandNodeNames(ridge_target, returnScalarComponents = TRUE)
-propCov_seed  <- cov(as.matrix(prev)[, ridge_scalars])
-
-mcmc_conf$removeSamplers(ridge_target)
-mcmc_conf$addSampler(target = ridge_target, type = "RW_block",
-                     control = list(propCov = propCov_seed, adaptInterval = 100))
-
-
 nimble_mcmc <- buildMCMC(mcmc_conf)
 compiled_mcmc <- compileNimble(nimble_mcmc, project = nimble_model, resetFunctions = TRUE)
 
 
 # Run the model 
 set.seed(2025)
-MCS <- 1*10^5
+MCS <- 1*10^6
 st  <- Sys.time()
 samples <- runMCMC(compiled_mcmc,
                    inits = mod_inits,
@@ -478,4 +437,4 @@ samples <- runMCMC(compiled_mcmc,
                    setSeed = 2) 
 
 Sys.time()-st
-save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_N_pois_ridge_block_2026_06_20.Rda")
+save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_2026_03_24.Rda")
