@@ -360,6 +360,10 @@ mod_inits <- list(y = as.matrix(yinit),
                   beta.mu = logit_beta.mu.init
 )
 
+# three dispersed init sets: perturb beta.mu (the weakly-identified level) for R-hat
+inits_list <- lapply(c(0, 1, -1), function(d)
+  modifyList(mod_inits, list(beta.mu = logit_beta.mu.init + d * c(1, 0.2))))
+
 # BUILD AND RUN NIMBLE MODEL
 nimble_model <- nimbleModel(model_code,
                             mod_constants,
@@ -422,11 +426,14 @@ compiled_mcmc <- compileNimble(nimble_mcmc, project = nimble_model, resetFunctio
 
 # Run the model 
 set.seed(2025)
-MCS <- 3*10^6
+MCS <- 1*10^6
+
+# guard so the parallel script can source this file build-only (skips the run)
+if(!exists("BUILD_ONLY")){
 st  <- Sys.time()
 samples <- runMCMC(compiled_mcmc,
-                   inits = mod_inits,
-                   nchains = 1, 
+                   inits = inits_list,
+                   nchains = 3, 
                    nburnin=MCS/2,
                    niter = MCS,
                    samplesAsCodaMCMC = TRUE,
@@ -434,7 +441,8 @@ samples <- runMCMC(compiled_mcmc,
                    summary = FALSE, 
                    WAIC = FALSE,
                    progressBar = TRUE,
-                   setSeed = 2) 
+                   setSeed = 1:3)
 
 Sys.time()-st
 save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_N_pois_3_mill_2026_06_21.Rda")
+}
