@@ -346,10 +346,24 @@ if(length(II) > 0){
   
 }
 
+# data-implied inits for the time-varying intercepts (log/logit of mean count / mean N);
+# starting at 0 puts the poisson means ~N, orders of magnitude too high
+meanN <- mean(Ninit)
+hosp_c <- ifelse(is.na(yfit$hosp), 3, yfit$hosp) # censored counts in [1,9]: rough midpoint
+ed_c <- ifelse(is.na(yfit$ed), 3, yfit$ed)
+beta.init[, 4] <- log(mean(hosp_c, na.rm = TRUE) / meanN) # hosp (poisson)
+beta.init[3:T, 3] <- log(mean(ed_c, na.rm = TRUE) / meanN) # ed (poisson, t >= 3)
+beta.init[, 1] <- qlogis(pmin(pmax(mean(yfit$pmp, na.rm = TRUE) / meanN, 1e-4), 0.99)) # pmp (binomial)
+beta.init[, 2] <- qlogis(pmin(pmax(mean(yfit$death, na.rm = TRUE) / meanN, 1e-5), 0.99)) # death (binomial)
+
+# initialize eps explicitly (previously unset, so nimble simulated it)
+epsinit <- matrix(0, nrow = n*T, ncol = K)
+
 # set initial values.
 mod_inits <- list(y = as.matrix(yinit),
                   N = Ninit,
                   beta = beta.init,
+                  eps = epsinit,
                   cov.eps = diag(K),
                   tau.v = .1, 
                   u = uinit,
