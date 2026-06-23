@@ -5,7 +5,7 @@ library(coda)
 T   <- length(grep("^mu\\[", varnames(samples)))
 beta_cols <- grep("^beta\\[", varnames(samples), value = TRUE)
 beta_cols <- beta_cols[apply(as.matrix(samples[, beta_cols]), 2, var) > 0]  # drop the inert ED early-year cells
-key <- c("beta.mu[1]", "beta.mu[2]", beta_cols, paste0("mu[", 1:T, "]"))
+beta_cols <- beta_cols[-which(is.na(beta_cols))]
 
 # effective sample size, pooled across chains
 print(round(effectiveSize(samples[, key])))
@@ -14,4 +14,5 @@ print(round(effectiveSize(samples[, key])))
 if(nchain(samples) > 1) print(round(gelman.diag(samples[, key], multivariate = FALSE)$psrf, 3))
 
 # trace + density, one color per chain
-plot(samples[, key])
+plot(samples[, beta_cols])
+
