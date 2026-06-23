@@ -22,7 +22,7 @@ library(readxl)
 load("WAprevalence/data/data_for_analysis.Rda")
 
 # IMPORT MCMC OUTPUT FROM MODEL
-load("WAprevalence/output/mcmc/MCMC_no_covariates_2026_03_24.Rda")
+load("WAprevalence/output/mcmc/MCMC_no_covariates_N_pois_3_mill_2026_06_21.Rda")
 
 # IMPORT SHAPE FILES FOR WA COUNTIES
 load("WAprevalence/data/shape_county_WA.Rda")

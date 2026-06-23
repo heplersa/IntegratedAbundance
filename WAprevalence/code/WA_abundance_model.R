@@ -51,7 +51,7 @@ model_code <- nimbleCode({
       # latent counts (process model)
       mu.u[(t-1)*R+i] <- 0
       lambda[(t-1)*R+i] <- exp((u[(t-1)*R+i] + mu.u[(t-1)*R+i]) + v[(t-1)*R+i])
-      N[(t-1)*R+i] ~ dbinom(mu[t]*lambda[(t-1)*R+i],P[(t-1)*R+i])
+      N[(t-1)*R+i] ~ dpois(mu[t]*lambda[(t-1)*R+i]*P[(t-1)*R+i])
       v[(t-1)*R+i] ~ dnorm(0,tau.v)
       
       
@@ -95,7 +95,7 @@ model_code <- nimbleCode({
       # latent counts (process model)
       mu.u[(t-1)*R+i] <- phi.u*u[(t-2)*R+i]
       lambda[(t-1)*R+i] <- exp((u[(t-1)*R+i] + mu.u[(t-1)*R+i]) + v[(t-1)*R+i])
-      N[(t-1)*R+i] ~ dbinom(mu[t]*lambda[(t-1)*R+i], P[(t-1)*R+i])
+      N[(t-1)*R+i] ~ dpois(mu[t]*lambda[(t-1)*R+i]*P[(t-1)*R+i])
       v[(t-1)*R+i] ~ dnorm(0, tau.v)
 
     }
@@ -138,7 +138,7 @@ model_code <- nimbleCode({
       # latent counts (process model)
       mu.u[(t-1)*R+i] <- phi.u*u[(t-2)*R+i]
       lambda[(t-1)*R+i] <- exp((u[(t-1)*R+i] + mu.u[(t-1)*R+i]) + v[(t-1)*R+i])
-      N[(t-1)*R+i] ~ dbinom(mu[t]*lambda[(t-1)*R+i], P[(t-1)*R+i])
+      N[(t-1)*R+i] ~ dpois(mu[t]*lambda[(t-1)*R+i]*P[(t-1)*R+i])
       v[(t-1)*R+i] ~ dnorm(0, tau.v)
 
     }
@@ -346,10 +346,24 @@ if(length(II) > 0){
   
 }
 
+# data-implied inits for the time-varying intercepts (log/logit of mean count / mean N);
+# starting at 0 puts the poisson means ~N, orders of magnitude too high
+meanN <- mean(Ninit)
+hosp_c <- ifelse(is.na(yfit$hosp), 3, yfit$hosp) # censored counts in [1,9]: rough midpoint
+ed_c <- ifelse(is.na(yfit$ed), 3, yfit$ed)
+beta.init[, 4] <- log(mean(hosp_c, na.rm = TRUE) / meanN) # hosp (poisson)
+beta.init[3:T, 3] <- log(mean(ed_c, na.rm = TRUE) / meanN) # ed (poisson, t >= 3)
+beta.init[, 1] <- qlogis(pmin(pmax(mean(yfit$pmp, na.rm = TRUE) / meanN, 1e-4), 0.99)) # pmp (binomial)
+beta.init[, 2] <- qlogis(pmin(pmax(mean(yfit$death, na.rm = TRUE) / meanN, 1e-5), 0.99)) # death (binomial)
+
+# initialize eps explicitly (previously unset, so nimble simulated it)
+epsinit <- matrix(0, nrow = n*T, ncol = K)
+
 # set initial values.
 mod_inits <- list(y = as.matrix(yinit),
                   N = Ninit,
                   beta = beta.init,
+                  eps = epsinit,
                   cov.eps = diag(K),
                   tau.v = .1, 
                   u = uinit,
@@ -359,6 +373,10 @@ mod_inits <- list(y = as.matrix(yinit),
                   phi.f = rep(.5, K), 
                   beta.mu = logit_beta.mu.init
 )
+
+# three dispersed init sets: perturb beta.mu (the weakly-identified level) for R-hat
+inits_list <- lapply(c(0, 1, -1), function(d)
+  modifyList(mod_inits, list(beta.mu = logit_beta.mu.init + d * c(1, 0.2))))
 
 # BUILD AND RUN NIMBLE MODEL
 nimble_model <- nimbleModel(model_code,
@@ -422,7 +440,10 @@ compiled_mcmc <- compileNimble(nimble_mcmc, project = nimble_model, resetFunctio
 
 # Run the model 
 set.seed(2025)
-MCS <- 1*10^6
+MCS <- 3*10^6
+
+# guard so the parallel script can source this file build-only (skips the run)
+if(!exists("BUILD_ONLY")){
 st  <- Sys.time()
 samples <- runMCMC(compiled_mcmc,
                    inits = mod_inits,
@@ -434,7 +455,8 @@ samples <- runMCMC(compiled_mcmc,
                    summary = FALSE, 
                    WAIC = FALSE,
                    progressBar = TRUE,
-                   setSeed = 2) 
+                   setSeed = 2)
 
 Sys.time()-st
-save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_2026_03_24.Rda")
+save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_N_pois_3_mill_2026_06_21.Rda")
+}
