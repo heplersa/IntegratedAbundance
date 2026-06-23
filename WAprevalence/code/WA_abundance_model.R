@@ -347,7 +347,6 @@ if(length(II) > 0){
 }
 
 # data-implied inits for the time-varying intercepts (log/logit of mean count / mean N);
-# starting at 0 puts the poisson means ~N, orders of magnitude too high
 meanN <- mean(Ninit)
 hosp_c <- ifelse(is.na(yfit$hosp), 3, yfit$hosp) # censored counts in [1,9]: rough midpoint
 ed_c <- ifelse(is.na(yfit$ed), 3, yfit$ed)
