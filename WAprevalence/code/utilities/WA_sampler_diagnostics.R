@@ -1,4 +1,4 @@
-# throwaway convergence check for the 3-chain run; run after the model (uses `samples`), then delete
+# throwaway convergence check for the 3-chain run; run after the model (uses `samples`)
 # if starting fresh: load("WAprevalence/output/mcmc/<run>.Rda") first
 library(coda)
 
