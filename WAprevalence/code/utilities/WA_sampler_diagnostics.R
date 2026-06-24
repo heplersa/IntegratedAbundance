@@ -2,7 +2,7 @@
 # if starting fresh: load("WAprevalence/output/mcmc/<run>.Rda") first
 library(coda)
 
-load("WAprevalence/output/mcmc/test.Rda")
+load("WAprevalence/output/mcmc/MCMC_no_covariates_N_pois_1_mill_3_chains_2026_06_22.Rda")
 
 T   <- length(grep("^mu\\[", varnames(samples)))
 beta_cols <- grep("^beta\\[", varnames(samples), value = TRUE)

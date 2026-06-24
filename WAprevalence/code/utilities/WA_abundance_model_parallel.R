@@ -26,4 +26,4 @@ chains <- parLapply(cl, 1:3, run_chain, wd = wd)
 stopCluster(cl)
 
 samples <- do.call(mcmc.list, chains)
-save(samples, file = "WAprevalence/output/mcmc/test.Rda")
+save(samples, file = "WAprevalence/output/mcmc//MCMC_no_covariates_N_pois_1_mill_3_chains_2026_06_22.Rda")
