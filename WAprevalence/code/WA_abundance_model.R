@@ -434,6 +434,42 @@ for(i in 1:n){
   )
 }
 
+# change RW sampler tuning parameters on beta to improve efficiency
+# outcomes with data over the whole study period
+for(j in c(1,2,4)) {
+  for(t in 1:T) {
+    # remove default sampler for beta
+    mcmc_conf$removeSampler(paste0("beta[",t, ", ", j, "]"))
+
+    # add RW sampler with custom adaptation controls
+    mcmc_conf$addSampler(
+      target = paste0("beta[",t, ", ", j, "]"),
+      type = "RW",
+      control = list(
+        scale = .5,              # initial proposal sd
+        adaptive = TRUE,        # enable adaptation
+        adaptInterval = 50     # how often to adapt
+      )
+    )
+
+  }
+}
+
+# ED visit outcome: no data for 2017-2018, so beta only exists for t = 3:T
+for(t in 3:T) {
+  mcmc_conf$removeSampler(paste0("beta[",t, ", 3]"))
+
+  mcmc_conf$addSampler(
+    target = paste0("beta[",t, ", 3]"),
+    type = "RW",
+    control = list(
+      scale = .5,
+      adaptive = TRUE,
+      adaptInterval = 50
+    )
+  )
+}
+
 
 nimble_mcmc <- buildMCMC(mcmc_conf)
 compiled_mcmc <- compileNimble(nimble_mcmc, project = nimble_model, resetFunctions = TRUE)
