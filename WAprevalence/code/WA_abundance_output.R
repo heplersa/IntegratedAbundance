@@ -22,7 +22,7 @@ library(readxl)
 load("WAprevalence/data/data_for_analysis.Rda")
 
 # IMPORT MCMC OUTPUT FROM MODEL
-load("WAprevalence/output/mcmc/MCMC_no_covariates_N_pois_3_mill_2026_06_21.Rda")
+load("WAprevalence/output/mcmc/MCMC_N_pois_3_chains_2_mill_each_2026_06_28.Rda")
 
 # IMPORT SHAPE FILES FOR WA COUNTIES
 load("WAprevalence/data/shape_county_WA.Rda")
@@ -52,7 +52,10 @@ MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 1]"), 
 MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 2]"), ISB = F, filename = "eps_death", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 3]"), ISB = F, filename = "eps_ed", wd = "WAprevalence/output/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 4]"), ISB = F, filename = "eps_hosp", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = "cov.eps", filename = "cov.eps", wd = "WAprevalence/output/diagnostics")
+MCMCvis::MCMCtrace(samples, params = "prec.eps", filename = "prec.eps", wd = "WAprevalence/output/diagnostics")
+
+# COMBINE CHAINS FOR POSTERIOR INFERENCE
+samples <- rbind(samples[[1]], samples[[2]], samples[[3]])
 
 # EXTRACT POSTERIOR MEANS, 95% CrI (QUANTILES), SD
 results <- list(colMeans(samples, na.rm = T),
