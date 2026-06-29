@@ -477,7 +477,7 @@ compiled_mcmc <- compileNimble(nimble_mcmc, project = nimble_model, resetFunctio
 
 # Run the model 
 set.seed(2025)
-MCS <- 1*10^4
+MCS <- 2*10^6
 
 # guard so the parallel script can source this file build-only (skips the run)
 if(!exists("BUILD_ONLY")){

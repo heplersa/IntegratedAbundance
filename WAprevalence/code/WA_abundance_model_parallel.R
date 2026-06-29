@@ -27,5 +27,5 @@ stopCluster(cl)
 
 samples <- do.call(mcmc.list, chains)
 
-dir.create("WAprevalence/output/mcmc", recursive = T, showWarnings = F)
+dir.create("WAprevalence/output/mcmc", recursive = TRUE, showWarnings = FALSE)
 save(samples, file = "WAprevalence/output/mcmc/MCMC_N_pois_3_chains_2_mill_each_2026_06_28.Rda")
