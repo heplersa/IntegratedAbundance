@@ -38,7 +38,7 @@ model_code <- nimbleCode({
         censored_hosp[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,4], c_hosp[(t-1)*R+i, 1:2])
       
       # outcome error term
-      eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], cov = cov.eps[1:K, 1:K])
+      eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], prec = prec.eps[1:K, 1:K])
       
       # logistic link for binomial outcome(s)
       pi[(t-1)*R+i,1] <- ilogit(beta[t,1] + (f[(t-1)*R+i,1] + mu.f[(t-1)*R+i,1]) + eps[(t-1)*R+i,1])
@@ -83,7 +83,7 @@ model_code <- nimbleCode({
         censored_hosp[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,4], c_hosp[(t-1)*R+i, 1:2])
 
       # outcome error term
-      eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], cov = cov.eps[1:K, 1:K])
+      eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], prec = prec.eps[1:K, 1:K])
 
       # logistic link for binomial outcome(s)
       pi[(t-1)*R+i,1] <- ilogit(beta[t,1] + (f[(t-1)*R+i,1] + mu.f[(t-1)*R+i,1]) + eps[(t-1)*R+i,1])
@@ -126,7 +126,7 @@ model_code <- nimbleCode({
         censored_hosp[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,4], c_hosp[(t-1)*R+i, 1:2])
 
       # outcome error term
-      eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], cov = cov.eps[1:K, 1:K])
+      eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], prec = prec.eps[1:K, 1:K])
 
       # logistic link for binomial outcome(s)
       pi[(t-1)*R+i,1] <- ilogit(beta[t,1] + (f[(t-1)*R+i,1] + mu.f[(t-1)*R+i,1]) + eps[(t-1)*R+i,1])
@@ -243,7 +243,7 @@ model_code <- nimbleCode({
   
   beta.mu[1:2] ~ dmnorm(mean = mean.mu[1:2], cov = cov.mu[1:2, 1:2])
   
-  cov.eps[1:K, 1:K] ~ dwish(R=cov.eps.R[1:K, 1:K], df=K)
+  prec.eps[1:K, 1:K] ~ dwish(R=prec.eps.R[1:K, 1:K], df=K)
   
   tau.u ~ dgamma(.5,.5) # variance parameter for for spatial random effect in process level
   phi.u ~ dunif(0,1) # auto-regressive parameter for spatial random effect in process level
@@ -287,7 +287,7 @@ mod_constants <- list(R = n,
                       mean.mu = rep(0, 2),
                       cov.mu = 10^4*diag(2),
                       mean.eps = rep(0, K),
-                      cov.eps.R = diag(K),
+                      prec.eps.R = diag(K),
                       c_ed = c_ed,
                       c_hosp = c_hosp
 )
@@ -363,7 +363,7 @@ mod_inits <- list(y = as.matrix(yinit),
                   N = Ninit,
                   beta = beta.init,
                   eps = epsinit,
-                  cov.eps = diag(K),
+                  prec.eps = diag(K),
                   tau.v = .1, 
                   u = uinit,
                   f = finit,
@@ -373,9 +373,11 @@ mod_inits <- list(y = as.matrix(yinit),
                   beta.mu = logit_beta.mu.init
 )
 
-# three dispersed init sets: perturb beta.mu (the weakly-identified level) for R-hat
+# three dispersed init sets for R-hat: perturb beta.mu (survey-level intercept) and beta
+# (the outcome intercepts), matching the CA model so the beta R-hat is a real overdispersion test
 inits_list <- lapply(c(0, 1, -1), function(d)
-  modifyList(mod_inits, list(beta.mu = logit_beta.mu.init + d * c(1, 0.2))))
+  modifyList(mod_inits, list(beta.mu = logit_beta.mu.init + d * c(1, 0.2),
+                             beta = beta.init + d * 0.3)))
 
 # BUILD AND RUN NIMBLE MODEL
 nimble_model <- nimbleModel(model_code,
@@ -391,7 +393,7 @@ mcmc_conf <- configureMCMC(nimble_model,
                            monitors=c('tau.u',
                                       'tau.f',
                                       'eps',
-                                      'cov.eps',
+                                      'prec.eps',
                                       'v',
                                       'beta',
                                       'beta.mu',
@@ -432,6 +434,42 @@ for(i in 1:n){
   )
 }
 
+# change RW sampler tuning parameters on beta to improve efficiency
+# outcomes with data over the whole study period
+for(j in c(1,2,4)) {
+  for(t in 1:T) {
+    # remove default sampler for beta
+    mcmc_conf$removeSampler(paste0("beta[",t, ", ", j, "]"))
+
+    # add RW sampler with custom adaptation controls
+    mcmc_conf$addSampler(
+      target = paste0("beta[",t, ", ", j, "]"),
+      type = "RW",
+      control = list(
+        scale = .5,              # initial proposal sd
+        adaptive = TRUE,        # enable adaptation
+        adaptInterval = 50     # how often to adapt
+      )
+    )
+
+  }
+}
+
+# ED visit outcome: no data for 2017-2018, so beta only exists for t = 3:T
+for(t in 3:T) {
+  mcmc_conf$removeSampler(paste0("beta[",t, ", 3]"))
+
+  mcmc_conf$addSampler(
+    target = paste0("beta[",t, ", 3]"),
+    type = "RW",
+    control = list(
+      scale = .5,
+      adaptive = TRUE,
+      adaptInterval = 50
+    )
+  )
+}
+
 
 nimble_mcmc <- buildMCMC(mcmc_conf)
 compiled_mcmc <- compileNimble(nimble_mcmc, project = nimble_model, resetFunctions = TRUE)
@@ -439,14 +477,14 @@ compiled_mcmc <- compileNimble(nimble_mcmc, project = nimble_model, resetFunctio
 
 # Run the model 
 set.seed(2025)
-MCS <- 3*10^6
+MCS <- 2*10^6
 
 # guard so the parallel script can source this file build-only (skips the run)
 if(!exists("BUILD_ONLY")){
 st  <- Sys.time()
 samples <- runMCMC(compiled_mcmc,
-                   inits = mod_inits,
-                   nchains = 1, 
+                   inits = inits_list[[1]],
+                   nchains = 1,
                    nburnin=MCS/2,
                    niter = MCS,
                    samplesAsCodaMCMC = TRUE,
@@ -457,5 +495,5 @@ samples <- runMCMC(compiled_mcmc,
                    setSeed = 2)
 
 Sys.time()-st
-save(samples, file = "WAprevalence/output/mcmc/MCMC_no_covariates_N_pois_3_mill_2026_06_21.Rda")
+save(samples, file = "WAprevalence/output/mcmc/MCMC_N_pois_2_mill_2026_06_28.Rda")
 }
