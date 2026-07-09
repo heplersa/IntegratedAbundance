@@ -527,95 +527,115 @@ ggsave(filename = "N.png",
          height = 10,
          units = "cm")
 
-# CREATE BISCALE PLOT #
+# CREATE BISCALE PLOTS #
 
-  # prepare data
-  prev_pmp_data <-  N_results %>%
-    select(county,
-           year,
-           mean_prev) %>%
-    left_join(pmp_results,
-              by = c("county", "year")) %>%
-    select(county,
-           year,
-           mean_prev,
-           mean) %>%
-    rename(prev_est = mean_prev,
-           pmp_est = mean)
-  
-  # for a given year, combine model estimates w/ spatial info & apply bi_class  
-  biscale_data_year <- function(year) {
-    
-     shape_county_WA %>%
+  # pair prevalence estimates w/ estimates for a given outcome
+  prev_outcome_data <- function(outcome_results) {
+
+    N_results %>%
+      select(county,
+             year,
+             mean_prev) %>%
+      left_join(outcome_results,
+                by = c("county", "year")) %>%
+      select(county,
+             year,
+             mean_prev,
+             mean) %>%
+      rename(prev_est = mean_prev,
+             outcome_est = mean)
+
+  }
+
+  # for a given year, combine model estimates w/ spatial info & apply bi_class
+  biscale_data_year <- function(data, year) {
+
+     data_year <- shape_county_WA %>%
             mutate(NAME = tolower(NAME)) %>%
             rename(county = NAME) %>%
-            left_join(prev_pmp_data[prev_pmp_data$year==year,],
-                      by = c("county")) %>%
-            bi_class(x = prev_est, 
-                     y = pmp_est,
+            left_join(data[data$year==year,],
+                      by = c("county"))
+
+     # years w/ no outcome estimates (ED visits in 2017-2018) are mapped as missing
+     if(all(is.na(data_year$outcome_est))) {
+
+       data_year %>% mutate(bi_class = NA)
+
+     } else {
+
+       data_year %>%
+            bi_class(x = prev_est,
+                     y = outcome_est,
                      style = "quantile",
                      dim = 4)
-    
-    
-    
+
+     }
+
   }
-  
-  # create biscale class variable for each year
-  biscale_data_2017 <- biscale_data_year(2017)
-  biscale_data_2018 <- biscale_data_year(2018)
-  biscale_data_2019 <- biscale_data_year(2019)
-  biscale_data_2020 <- biscale_data_year(2020)
-  biscale_data_2021 <- biscale_data_year(2021)
-  biscale_data_2022 <- biscale_data_year(2022)
-  biscale_data_2023 <- biscale_data_year(2023)
 
-  # stack data
-  biscale_data <- biscale_data_2017 %>%
-                    bind_rows(biscale_data_2018,
-                              biscale_data_2019,
-                              biscale_data_2020,
-                              biscale_data_2021,
-                              biscale_data_2022,
-                              biscale_data_2023)
+  # create and save biscale plot of prevalence vs a given outcome
+  create_biscale_plot <- function(outcome_results, outcome_label, filename) {
 
-  # create biscale plot
-  biscale_legend <- bi_legend(pal = "GrPink2",
-                              dim = 4,
-                              xlab = "Prevalence",
-                              ylab = "Buprenorphine",
-                              size = 5)
-  
-  biscale_map <- biscale_data %>%
-                    ggplot() +
-                    geom_sf(aes(fill = bi_class), 
-                            color = "white",
-                            size = 0.1, 
-                            show.legend = F) +
-                      bi_scale_fill(pal = "GrPink2", dim = 4) +
-                      facet_wrap(~year, nrow = 2, ncol = 4) +
-                      theme_map() +
-                      theme(strip.background = element_rect(fill = "white", color = NA),
-                            strip.text = element_text(color = "black",
-                                                      size = 7.5, 
-                                                      hjust = 0),
-                            legend.text = element_text(size = 12),
-                            legend.title = element_text(size = 12)
-                      )
-   
-   ggdraw() +
-     draw_plot(biscale_map, 0, 0, 1, 1) +
-     draw_plot(biscale_legend, 0.77, .26, 0.2, 0.2) 
-     #draw_plot(biscale_legend, 0.4, .8, 0.2, 0.2) 
-   
-   ggsave("biplot_4dim.png",
-          device="png",
-          path="WAprevalence/output/maps",
-          width = 12,
-          height = 10,
-          units = "cm",
-          bg = "white")
-   
+    data <- prev_outcome_data(outcome_results)
+
+    # create biscale class variable for each year and stack
+    biscale_data <- biscale_data_year(data, 2017) %>%
+                      bind_rows(biscale_data_year(data, 2018),
+                                biscale_data_year(data, 2019),
+                                biscale_data_year(data, 2020),
+                                biscale_data_year(data, 2021),
+                                biscale_data_year(data, 2022),
+                                biscale_data_year(data, 2023))
+
+    # create biscale plot
+    biscale_legend <- bi_legend(pal = "GrPink2",
+                                dim = 4,
+                                xlab = "Prevalence",
+                                ylab = outcome_label,
+                                size = 5)
+
+    biscale_map <- biscale_data %>%
+                      ggplot() +
+                      geom_sf(aes(fill = bi_class),
+                              color = "white",
+                              size = 0.1,
+                              show.legend = F) +
+                        bi_scale_fill(pal = "GrPink2", dim = 4) +
+                        facet_wrap(~year, nrow = 2, ncol = 4) +
+                        theme_map() +
+                        theme(strip.background = element_rect(fill = "white", color = NA),
+                              strip.text = element_text(color = "black",
+                                                        size = 7.5,
+                                                        hjust = 0),
+                              legend.text = element_text(size = 12),
+                              legend.title = element_text(size = 12)
+                        )
+
+     # legend occupies the empty facet slot
+     ggdraw() +
+       draw_plot(biscale_map, 0, 0, 1, 1) +
+       draw_plot(biscale_legend, 0.77, 0, 0.22, 0.528)
+
+     ggsave(filename,
+            device="png",
+            path="WAprevalence/output/maps",
+            width = 12,
+            height = 5,
+            units = "cm",
+            bg = "white")
+
+  }
+
+  # create biscale plot for each outcome
+  create_biscale_plot(pmp_results, "Buprenorphine", "biplot_4dim.png")
+  create_biscale_plot(death_results, "Deaths", "biplot_4dim_death.png")
+  create_biscale_plot(ed_results, "ED Visits", "biplot_4dim_ed.png")
+  create_biscale_plot(hosp_results, "Hospitalizations", "biplot_4dim_hosp.png")
+
 # COMPUTE SPATIAL CROSS CORRELATION USING LOCAL MORAN'S I #
+
+   # pair prevalence estimates w/ buprenorphine estimates
+   prev_pmp_data <- prev_outcome_data(pmp_results)
 
    # compute adjacency matrix for NC counties
    WA_map <- shape_county_WA[order(shape_county_WA$COUNTYFP),] #convert to data frame
@@ -637,7 +657,7 @@ ggsave(filename = "N.png",
     
     crossCorrelation_data <- prev_pmp_data[prev_pmp_data$year == year,]
     prev_est <- crossCorrelation_data %>% pull(prev_est)
-    pmp_est <- crossCorrelation_data %>% pull(pmp_est)
+    pmp_est <- crossCorrelation_data %>% pull(outcome_est)
     
     crossCorrelation(prev_est,
                      pmp_est,
