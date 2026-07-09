@@ -372,13 +372,92 @@ ggsave(filename = "lambda_CrI.png",
        height = 3,
        width = 10)
 
-ggsave(filename = "N.png", 
-       plot = N_map, 
-       path = "WAprevalence/output/maps", 
+ggsave(filename = "N.png",
+       plot = N_map,
+       path = "WAprevalence/output/maps",
        bg = "White",
        dpi = "retina",
        height = 3,
        width = 10)
+
+# CREATE COMPARISON MAP OF OBSERVED DEATH RATE FOR POP VS FOR PWMO IN 2023 #
+
+  # compute county-level death rate for pop and for PWMO
+  death_rate_data <- N_results %>%
+    select(county,
+           year,
+           pop,
+           mean) %>%
+    rename(N_est = mean) %>%
+    mutate(death = yfit$death,
+           death_rate_pop = death/pop,
+           death_rate_PWMO = death/N_est)
+
+  # compute the statewide observed death rate for pop and for PWMO in 2023
+  state_wide_death_rate <- death_rate_data %>%
+    filter(year == 2023) %>%
+    summarise(pop_rate = sum(death)/sum(pop),
+              PWMO_rate = sum(death)/sum(N_est))
+
+  # create choropleth maps
+
+  # pop rate
+  death_pop_map <- shape_county_WA %>%
+    mutate(NAME = tolower(NAME)) %>%
+    rename(county = NAME) %>%
+    left_join(death_rate_data[death_rate_data$year==2023,],
+              by = c("county")) %>%
+    ggplot() +
+    geom_sf(aes(fill = death_rate_pop)) +
+    scale_fill_gradient2(low = "blue",
+                         mid = "white",
+                         high = "red",
+                         midpoint = state_wide_death_rate$pop_rate,
+                         guide = guide_colorbar(barheight = 7.5)) +
+    labs(fill = NULL,
+         title = "Overdose deaths per population") +
+    theme_map() +
+    theme(legend.position = "right",
+          legend.text = element_text(size = 12),
+          legend.title = element_text(size = 12),
+          plot.title = element_text(hjust = 0.7))
+
+  # PWMO rate
+  death_PWMO_map <- shape_county_WA %>%
+    mutate(NAME = tolower(NAME)) %>%
+    rename(county = NAME) %>%
+    left_join(death_rate_data[death_rate_data$year==2023,],
+              by = c("county")) %>%
+    ggplot() +
+    geom_sf(aes(fill = death_rate_PWMO)) +
+    scale_fill_gradient2(low = "blue",
+                         mid = "white",
+                         high = "red",
+                         midpoint = state_wide_death_rate$PWMO_rate,
+                         guide = guide_colorbar(barheight = 7.5)) +
+    labs(fill = NULL,
+         title = "Overdose deaths per PWMO") +
+    theme_map() +
+    theme(legend.position = "right",
+          legend.text = element_text(size = 12),
+          legend.title = element_text(size = 12),
+          plot.title = element_text(hjust = 0.7))
+
+  # make it so that scientific notation is disabled, undo this via option(scipen=0)
+  options(scipen = 999)
+
+  death_rate_comparison <- plot_grid(death_pop_map, death_PWMO_map,
+                                     align = "hv",
+                                     nrow = 1,
+                                     ncol = 2)
+
+  ggsave(filename = "death_pop_vs_PWMO_2023.png",
+         plot = death_rate_comparison,
+         path = "WAprevalence/output/maps",
+         bg = "White",
+         dpi = "retina",
+         height = 3,
+         width = 11)
 
 # EXAMINE ESTIMATED TIME-VARYING INTERCEPTS FOR EACH OUTCOME
 
