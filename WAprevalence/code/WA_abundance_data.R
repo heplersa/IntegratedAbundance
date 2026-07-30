@@ -152,7 +152,7 @@ library(tidycensus) # pull pop data from US Census
             filter(year >= 2017) %>%
             arrange(year, county)
   
-  # check that there is no missing data in marginal outcomes; for ed and hospitalization counts <5 are censored; account for this in the model
+  # check that there is no missing data in marginal outcomes; for ed and hospitalization, suppressed counts (raw value "*") are censored in [1,9]; account for this in the model
   apply(outcomes_processed[, c("pmp", "death", "ed", "hosp")], 2, function(x) sum(is.na(x))) == c(0, 0, 0, 0)
   # check that all counties-years are present; 6 years x 39 counties = 234 rows
   nrow(outcomes_processed) == 7*39
