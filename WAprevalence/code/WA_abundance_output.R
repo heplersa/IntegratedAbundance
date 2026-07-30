@@ -277,11 +277,11 @@ create_choropleth_map <- function(data, value, colorbar_type = NULL, colorbar_ti
 
 # generate and save maps
 
-  # observed maps
-  pmp_obs_rate_map <-  create_choropleth_map(data = pmp_results, value = pmp_obs_rate, colorbar_type = "monotonic")
-  death_obs_rate_map <-  create_choropleth_map(data = death_results, value = death_obs_rate, colorbar_type = "monotonic")
-  ed_obs_rate_map <-  create_choropleth_map(data = ed_results, value = ed_obs_rate, colorbar_type = "monotonic")
-  hosp_obs_rate_map <-  create_choropleth_map(data = hosp_results, value = hosp_obs_rate, colorbar_type = "monotonic")
+  # observed maps; rates displayed per 100,000 population aged 12+
+  pmp_obs_rate_map <-  create_choropleth_map(data = pmp_results %>% mutate(pmp_obs_rate = 1e5*pmp_obs_rate), value = pmp_obs_rate, colorbar_type = "monotonic", colorbar_title = "Rate per\n100,000")
+  death_obs_rate_map <-  create_choropleth_map(data = death_results %>% mutate(death_obs_rate = 1e5*death_obs_rate), value = death_obs_rate, colorbar_type = "monotonic", colorbar_title = "Rate per\n100,000")
+  ed_obs_rate_map <-  create_choropleth_map(data = ed_results %>% mutate(ed_obs_rate = 1e5*ed_obs_rate), value = ed_obs_rate, colorbar_type = "monotonic", colorbar_title = "Rate per\n100,000")
+  hosp_obs_rate_map <-  create_choropleth_map(data = hosp_results %>% mutate(hosp_obs_rate = 1e5*hosp_obs_rate), value = hosp_obs_rate, colorbar_type = "monotonic", colorbar_title = "Rate per\n100,000")
   
   # model maps
   pmp_map <- create_choropleth_map(data = pmp_results, value = mean, colorbar_type = "monotonic")
