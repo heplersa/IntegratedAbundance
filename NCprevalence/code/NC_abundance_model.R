@@ -3,7 +3,7 @@ library(tidyverse) # data manipulation and visualization
 library(nimble) # Bayesian inference for multi-level models
 
 # IMPORT PRE-PROCESSED DATA USED TO FIT MODEL (data_for_analysis.Rda is generated from the NC_abundance_data.R file)
-load("../data/data_for_analysis.Rda")
+load("NCprevalence/data/data_for_analysis.Rda")
 
 # DEFINE NIMBLE MODEL
 model_code <- nimbleCode({
@@ -463,6 +463,6 @@ samples <- runMCMC(compiled_mcmc,
 
 Sys.time()-st
 
-save(samples, file = "../output/full/NC_abundance_output_full_revision.Rda")
+save(samples, file = "NCprevalence/output/full/NC_abundance_output_full_revision.Rda")
 
 q()
