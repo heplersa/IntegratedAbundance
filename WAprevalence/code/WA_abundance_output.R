@@ -189,6 +189,28 @@ write.csv(N_prev_results_csv,
           file = "WAprevalence/output/tables/N_prev_results.csv",
           row.names = F)
 
+# CREATE STATE-WIDE PREVALENCE TABLE FOR MANUSCRIPT
+
+  # prevalence column is the posterior for mu; PWUO-HR column sums the county-level estimates
+  statewide_prevalence_table <- N_results %>%
+                                  group_by(year) %>%
+                                  summarise(N_est = sum(mean),
+                                            pop = sum(pop)) %>%
+                                  mutate(prev = 100*results[[1]][mu_lwr:mu_upr],
+                                         lwr95 = 100*results[[2]][1, mu_lwr:mu_upr],
+                                         upr95 = 100*results[[2]][2, mu_lwr:mu_upr]) %>%
+                                  transmute(Year = year,
+                                            `Prevalence % (95% CrI)` = sprintf("%.2f (%.2f, %.2f)", prev, lwr95, upr95),
+                                            `Estimated PWUO-HR` = format(round(N_est), big.mark = ","),
+                                            `Population 12+` = format(pop, big.mark = ","))
+
+  write.csv(statewide_prevalence_table,
+            file = "WAprevalence/output/tables/statewide_prevalence_table.csv",
+            row.names = F)
+
+  save_as_docx(autofit(flextable(statewide_prevalence_table)),
+               path = "WAprevalence/output/tables/statewide_prevalence_table.docx")
+
 # EXAMINE MODIFIED GELMAN-RUBIN (GR) STATISTICS FOR SELECT PARAMETERS
 
   # exclude 2017-2018 for ED outcome as these were not modeled and therefore not sampled
@@ -490,11 +512,17 @@ ggsave(filename = "N.png",
                             cbind(post_binom_outcome_prev[[2]], matrix(c(NA, NA, NA, NA), nrow=2, ncol=2), post_pois_outcome_prev[[2]]))
   
   # specify outcomes name and size
-  outcomes <- c("Buprenorphine prescription", 
-                "Death due to opioid misuse",
-                "ED visit due to opioid misuse",
-                "Hospitalization due to opioid misuse"
+  outcomes <- c("Buprenorphine receipt",
+                "Overdose death",
+                "ED visit",
+                "Hospitalization"
   )
+
+  # colorblind-safe palette (Okabe-Ito); overlapping death/hosp series get the most distinct pair
+  outcome_cols <- c("Buprenorphine receipt" = "#009E73",
+                    "Overdose death" = "#0072B2",
+                    "ED visit" = "#CC79A7",
+                    "Hospitalization" = "#D55E00")
   
   K <- length(outcomes)
        
@@ -508,11 +536,13 @@ ggsave(filename = "N.png",
     ) %>%
       mutate(across(c(pred_beta, lwr95, upr95), log)) %>%
       ggplot(aes(x = year, y = pred_beta, fill = outcome)) +
-      geom_point(aes(color = outcome)) +
+      geom_point(aes(color = outcome, shape = outcome)) +
       geom_errorbar(aes(ymin = lwr95, ymax = upr95, color = outcome),
                     width = 0.05) +
       geom_line(linetype = "dashed", aes(color = outcome)) +
       geom_ribbon(aes(ymin = lwr95, ymax = upr95), alpha = 0.1) +
+      scale_color_manual(values = outcome_cols) +
+      scale_fill_manual(values = outcome_cols) +
       scale_y_continuous(
                          breaks = c(-10:0),
                          labels = round(c(0, exp(-9:0)), 3)
@@ -524,8 +554,9 @@ ggsave(filename = "N.png",
       theme_classic() +
       labs(color = "Outcome",
            fill = "Outcome",
+           shape = "Outcome",
            x = "Year",
-           y = "Estimated prevalence")
+           y = "Statewide rate among PWUO-HR")
   
   ggsave(filename = "beta_log.png",
          path = "WAprevalence/output",
@@ -595,7 +626,7 @@ ggsave(filename = "N.png",
                 fill = "light blue",
                 alpha = 0.5) +
     labs(x = "Year",
-         y = "Statewide Prevalence of PWMO") +
+         y = "Statewide prevalence of higher-risk opioid use") +
     scale_color_manual(name = "", values = c("NSDUH Data" = "black", "Model" = "blue")) +
     theme_classic()
   
@@ -605,6 +636,96 @@ ggsave(filename = "N.png",
          width = 12,
          height = 10,
          units = "cm")
+
+# CREATE COUNTY TREND FIGURE FOR MANUSCRIPT #
+
+  # stack prevalence and the four outcome rates; ED visits are only estimated from 2019
+  trend_data <- bind_rows(N_results %>% transmute(county, year, est = mean_prev, panel = "A) Prevalence of higher-risk opioid use"),
+                          pmp_results %>% transmute(county, year, est = mean, panel = "B) Buprenorphine rate among PWUO-HR"),
+                          death_results %>% transmute(county, year, est = mean, panel = "C) Overdose death rate among PWUO-HR"),
+                          ed_results %>% transmute(county, year, est = mean, panel = "D) ED visit rate among PWUO-HR"),
+                          hosp_results %>% transmute(county, year, est = mean, panel = "E) Hospitalization rate among PWUO-HR"))
+
+  # label the highest and lowest county in each panel's final year
+  trend_labels <- trend_data %>%
+                    filter(!is.na(est)) %>%
+                    group_by(panel) %>%
+                    filter(year == max(year)) %>%
+                    filter(est == max(est) | est == min(est)) %>%
+                    mutate(county = str_to_title(county))
+
+  county_trend_plot <- trend_data %>%
+                        ggplot(aes(x = year, y = est, group = county)) +
+                        geom_line(linewidth = 0.3) +
+                        geom_text(aes(label = county),
+                                  data = trend_labels,
+                                  hjust = -0.08,
+                                  size = 2.3) +
+                        facet_wrap(~panel, scales = "free_y", ncol = 3) +
+                        coord_cartesian(clip = "off") + # county labels sit outside the panel
+                        scale_x_continuous(breaks = seq(2017, 2023, 2),
+                                           expand = expansion(mult = c(0.03, 0.32))) +
+                        labs(x = "Year", y = NULL) +
+                        theme_bw(base_size = 11) +
+                        theme(panel.grid = element_blank(),
+                              strip.background = element_blank(),
+                              strip.text = element_text(color = "black", size = 8.5, hjust = 0),
+                              axis.text = element_text(color = "black", size = 8.5),
+                              panel.spacing = unit(1.2, "lines"))
+
+  ggsave("trend_spaghetti.png",
+         county_trend_plot,
+         device = "png",
+         path = "WAprevalence/output/maps",
+         width = 11,
+         height = 6.8,
+         bg = "white")
+
+# CREATE RATE DENOMINATOR COMPARISON FIGURE FOR MANUSCRIPT #
+
+  # each outcome rate expressed per 100,000 population and per 100 PWUO-HR
+  denominator_data <- bind_rows(pmp_results %>% mutate(outcome = "Buprenorphine"),
+                                death_results %>% mutate(outcome = "Overdose death"),
+                                ed_results %>% mutate(outcome = "ED visits"),
+                                hosp_results %>% mutate(outcome = "Hospitalizations")) %>%
+                        left_join(N_results %>% select(county, year, N_est = mean),
+                                  by = c("county", "year")) %>%
+                        filter(!is.na(mean)) %>%
+                        transmute(county,
+                                  year,
+                                  outcome,
+                                  `per 100,000 population 12+` = 10^5*mean*N_est/pop,
+                                  `per 100 PWUO-HR` = 100*mean) %>%
+                        pivot_longer(starts_with("per"),
+                                     names_to = "denominator",
+                                     values_to = "rate")
+
+  # panel order: one outcome per row, population denominator on the left
+  panel_order <- expand_grid(outcome = c("Buprenorphine", "Overdose death", "ED visits", "Hospitalizations"),
+                             denominator = c("per 100,000 population 12+", "per 100 PWUO-HR")) %>%
+                   mutate(panel = paste0(LETTERS[1:8], ") ", outcome, " ", denominator))
+
+  denominator_plot <- denominator_data %>%
+                        left_join(panel_order, by = c("outcome", "denominator")) %>%
+                        mutate(panel = factor(panel, levels = panel_order$panel)) %>%
+                        ggplot(aes(x = factor(year), y = rate)) +
+                        geom_boxplot(linewidth = 0.3, outlier.size = 0.5, fill = "grey92") +
+                        facet_wrap(~panel, scales = "free_y", ncol = 2) +
+                        labs(x = "Year", y = NULL) +
+                        theme_bw(base_size = 10) +
+                        theme(panel.grid = element_blank(),
+                              strip.background = element_blank(),
+                              strip.text = element_text(color = "black", size = 8.5, hjust = 0),
+                              axis.text = element_text(color = "black", size = 7.5),
+                              panel.spacing = unit(0.8, "lines"))
+
+  ggsave("rate_denominator_boxplots.png",
+         denominator_plot,
+         device = "png",
+         path = "WAprevalence/output/maps",
+         width = 8,
+         height = 9.5,
+         bg = "white")
 
 # CREATE BISCALE PLOTS #
 
