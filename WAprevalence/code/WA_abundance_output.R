@@ -421,7 +421,7 @@ ggsave(filename = "N.png",
     summarise(pop_rate = sum(death)/sum(pop),
               PWMO_rate = sum(death)/sum(N_est))
 
-  # create choropleth maps
+  # create choropleth maps (what is the right legend/scale comparison here?)
 
   # pop rate
   death_pop_map <- shape_county_WA %>%
@@ -437,7 +437,7 @@ ggsave(filename = "N.png",
                          midpoint = state_wide_death_rate$pop_rate,
                          guide = guide_colorbar(barheight = 7.5)) +
     labs(fill = NULL,
-         title = "Overdose deaths per population") +
+         title = "Overdose death rate among population 12+") +
     theme_map() +
     theme(legend.position = "right",
           legend.text = element_text(size = 12),
@@ -458,7 +458,7 @@ ggsave(filename = "N.png",
                          midpoint = state_wide_death_rate$PWMO_rate,
                          guide = guide_colorbar(barheight = 7.5)) +
     labs(fill = NULL,
-         title = "Overdose deaths per PWMO") +
+         title = "Overdose deaths rate among PWUO-HR") +
     theme_map() +
     theme(legend.position = "right",
           legend.text = element_text(size = 12),
@@ -626,7 +626,7 @@ ggsave(filename = "N.png",
                 fill = "light blue",
                 alpha = 0.5) +
     labs(x = "Year",
-         y = "Statewide prevalence of higher-risk opioid use") +
+         y = "Statewide prevalence of PWUO-HR") +
     scale_color_manual(name = "", values = c("NSDUH Data" = "black", "Model" = "blue")) +
     theme_classic()
   
