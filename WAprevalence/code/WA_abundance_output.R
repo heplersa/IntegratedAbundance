@@ -832,6 +832,41 @@ ggsave(filename = "N.png",
   create_biscale_plot(ed_results, "ED Visits", "biplot_4dim_ed.png")
   create_biscale_plot(hosp_results, "Hospitalizations", "biplot_4dim_hosp.png")
 
+# COMPUTE POSTERIOR PROBABILITY OF GAP MEMBERSHIP BY RANK THRESHOLD (PREVALENCE VS BUPRENORPHINE) #
+
+  # P(county is among the r highest-prevalence and r lowest-buprenorphine counties in a year),
+  # classified within each posterior draw and averaged over draws; r = 10 matches the biscale quartiles
+  gap_prob_year <- function(t) {
+
+    prev_draws <- sweep(samples[, paste0("N[", (t - 1)*39 + 1:39, "]")], 2,
+                        yfit$pop[yfit$year == 2016 + t], "/")
+    bup_draws <- samples[, paste0("pi[", (t - 1)*39 + 1:39, ", 1]")]
+
+    # rank each draw once; all thresholds reuse the same ranks
+    prev_ranks <- t(apply(prev_draws, 1, rank))
+    bup_ranks <- t(apply(bup_draws, 1, rank))
+
+    map_dfr(1:19, function(r) {
+      tibble(county = yfit$county[yfit$year == 2016 + t],
+             year = 2016 + t,
+             r = r,
+             p_gap = colMeans(prev_ranks >= 40 - r & bup_ranks <= r))
+    })
+
+  }
+
+  gap_probs <- map_dfr(1:7, gap_prob_year)
+
+  write.csv(gap_probs,
+            file = "WAprevalence/output/tables/gap_probability_by_threshold.csv",
+            row.names = F)
+
+  # print 2023 at the quartile-equivalent threshold for the manuscript
+  gap_probs %>%
+    filter(year == 2023, r == 10) %>%
+    arrange(desc(p_gap)) %>%
+    print(n = 10)
+
 # COMPUTE SPATIAL CROSS CORRELATION USING LOCAL MORAN'S I #
 
    # pair prevalence estimates w/ buprenorphine estimates
