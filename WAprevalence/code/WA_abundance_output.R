@@ -976,6 +976,26 @@ ggsave(filename = "N.png",
             file = "WAprevalence/output/tables/pwuohr_without_bup.csv",
             row.names = F)
 
+  # statewide totals and proportions summed within each draw so the CrIs reflect joint uncertainty
+  untreated_state_csv <- map_dfr(1:7, function(t) {
+
+    state_draws <- rowSums(untreated_draws[, (t - 1)*39 + 1:39])
+    N_state <- rowSums(samples[, paste0("N[", (t - 1)*39 + 1:39, "]")])
+
+    tibble(year = 2016 + t,
+           mean = mean(state_draws),
+           lwr95 = quantile(state_draws, .025),
+           upr95 = quantile(state_draws, .975),
+           prop_mean = mean(state_draws/N_state),
+           prop_lwr95 = quantile(state_draws/N_state, .025),
+           prop_upr95 = quantile(state_draws/N_state, .975))
+
+  })
+
+  write.csv(untreated_state_csv,
+            file = "WAprevalence/output/tables/pwuohr_without_bup_statewide.csv",
+            row.names = F)
+
 # COMPUTE SPATIAL CROSS CORRELATION USING LOCAL MORAN'S I #
 
    # pair prevalence estimates w/ buprenorphine estimates
