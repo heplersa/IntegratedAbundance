@@ -551,7 +551,9 @@ ggsave(filename = "N.png",
                         #                     breaks = c(-6:0), 
                         #                     labels = round(c(exp(-6), exp(-5), exp(-4), exp(-3), exp(-2), exp(-1), exp(0)), 2))
       ) +
-      theme_classic() +
+      theme_bw(base_size = 11) +
+      theme(panel.grid = element_blank(),
+            axis.text = element_text(color = "black", size = 8.5)) +
       labs(color = "Outcome",
            fill = "Outcome",
            shape = "Outcome",
@@ -628,7 +630,9 @@ ggsave(filename = "N.png",
     labs(x = "Year",
          y = "Statewide prevalence of higher-risk opioid use") +
     scale_color_manual(name = "", values = c("NSDUH Data" = "black", "Model" = "blue")) +
-    theme_classic()
+    theme_bw(base_size = 11) +
+    theme(panel.grid = element_blank(),
+          axis.text = element_text(color = "black", size = 8.5))
   
   ggsave("2_yr_mu_trend.png",
          device="png",
