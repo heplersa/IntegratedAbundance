@@ -528,7 +528,7 @@ ggsave(filename = "N.png",
        
   # estimated prevalence among PWMO (binomial outcomes) & rate per-person among PWMO (poisson)
   # y-axis ticks mapped ot underlying prevalence or rate value
-  tibble(pred_beta = post_outcome_prev[[1]],
+  outcome_trend_plot <- tibble(pred_beta = post_outcome_prev[[1]],
          lwr95 = post_outcome_prev[[2]][1, ],
          upr95 = post_outcome_prev[[2]][2, ],
          year = rep(2017:2023, K),
@@ -561,6 +561,7 @@ ggsave(filename = "N.png",
            y = "Statewide rate among PWUO-HR")
   
   ggsave(filename = "beta_log.png",
+         plot = outcome_trend_plot,
          path = "WAprevalence/output",
          dpi = "retina",
          width = 13,
@@ -608,7 +609,7 @@ ggsave(filename = "N.png",
   upr95_aggr <- CrI_aggr %>% slice(2) %>% unlist()
   
   # plot model estimate against NSDUH
-  tibble(pred_mu_aggr = pred_mu_aggr,
+  mu_trend_plot <- tibble(pred_mu_aggr = pred_mu_aggr,
          lwr95_aggr = lwr95_aggr,
          upr95_aggr = upr95_aggr,
          year = 2017:2022
@@ -635,11 +636,32 @@ ggsave(filename = "N.png",
           axis.text = element_text(color = "black", size = 8.5))
   
   ggsave("2_yr_mu_trend.png",
+         mu_trend_plot,
          device="png",
          path="WAprevalence/output",
          width = 12,
          height = 10,
          units = "cm")
+
+# CREATE PAIRED STATE-LEVEL FIGURE FOR MANUSCRIPT #
+
+  # survey fit alongside the state-wide outcome rates
+  state_pair_plot <- plot_grid(mu_trend_plot +
+                                 theme(legend.position = c(0.76, 0.88),
+                                       legend.background = element_blank()),
+                               outcome_trend_plot,
+                               labels = c("A)", "B)"),
+                               label_size = 11,
+                               rel_widths = c(0.44, 0.56))
+
+  ggsave("state_level_pair.png",
+         state_pair_plot,
+         path = "WAprevalence/output",
+         dpi = "retina",
+         width = 26,
+         height = 10,
+         units = "cm",
+         bg = "white")
 
 # CREATE COUNTY TREND FIGURE FOR MANUSCRIPT #
 
@@ -656,12 +678,17 @@ ggsave(filename = "N.png",
                     group_by(panel) %>%
                     filter(year == max(year)) %>%
                     filter(est == max(est) | est == min(est)) %>%
-                    mutate(county = str_to_title(county))
+                    ungroup()
+
+  # draw the labeled counties in black over the remaining counties in grey
+  trend_highlight <- trend_data %>%
+                       semi_join(trend_labels, by = c("panel", "county"))
 
   county_trend_plot <- trend_data %>%
                         ggplot(aes(x = year, y = est, group = county)) +
-                        geom_line(linewidth = 0.3) +
-                        geom_text(aes(label = county),
+                        geom_line(linewidth = 0.3, color = "grey75") +
+                        geom_line(data = trend_highlight, linewidth = 0.5) +
+                        geom_text(aes(label = str_to_title(county)),
                                   data = trend_labels,
                                   hjust = -0.08,
                                   size = 2.3) +
@@ -870,6 +897,63 @@ ggsave(filename = "N.png",
     filter(year == 2023, r == 10) %>%
     arrange(desc(p_gap)) %>%
     print(n = 10)
+
+# CREATE THRESHOLD CURVES FIGURE FOR SUPPLEMENT #
+
+  # highlight the seven counties with the highest quartile-threshold probabilities in 2023
+  gap_2023 <- gap_probs %>% filter(year == 2023)
+
+  gap_top <- gap_2023 %>%
+               filter(r == 10) %>%
+               slice_max(p_gap, n = 7) %>%
+               pull(county)
+
+  # cascade the end labels downward to avoid overlap; leader segments tie each label to its line
+  gap_labels <- gap_2023 %>%
+                  filter(r == 19, county %in% gap_top) %>%
+                  arrange(desc(p_gap)) %>%
+                  mutate(lab_y = accumulate(p_gap, function(prev, y) min(y, prev - 0.035)))
+
+  gap_curve_plot <- ggplot(gap_2023, aes(x = r, y = p_gap, group = county)) +
+                      geom_vline(xintercept = c(5, 10, 13, 19),
+                                 linetype = "dashed",
+                                 color = "grey60",
+                                 linewidth = 0.3) +
+                      geom_line(data = filter(gap_2023, !county %in% gap_top),
+                                color = "grey75",
+                                linewidth = 0.3) +
+                      geom_line(data = filter(gap_2023, county %in% gap_top),
+                                linewidth = 0.5) +
+                      geom_segment(data = gap_labels,
+                                   aes(x = 19, xend = 19.55, y = p_gap, yend = lab_y),
+                                   color = "grey50",
+                                   linewidth = 0.2) +
+                      geom_text(data = gap_labels,
+                                aes(x = 19.65, y = lab_y, label = str_to_title(county)),
+                                hjust = 0,
+                                size = 2.4) +
+                      coord_cartesian(clip = "off") +
+                      scale_x_continuous(breaks = c(1, 5, 10, 13, 19),
+                                         expand = expansion(mult = c(0.02, 0.22)),
+                                         sec.axis = dup_axis(breaks = c(4, 8, 10, 13, 19),
+                                                             labels = c("deciles", "quintiles", "quartiles", "tertiles", "halves"),
+                                                             name = "Equivalent quantile classification")) +
+                      scale_y_continuous(limits = c(0, 1)) +
+                      labs(x = "Classification threshold r (number of counties)",
+                           y = "P(among r highest-prevalence and r lowest-coverage counties)") +
+                      theme_bw(base_size = 11) +
+                      theme(panel.grid = element_blank(),
+                            axis.text = element_text(color = "black", size = 8.5),
+                            axis.text.x.top = element_text(size = 8, face = "italic"),
+                            axis.title.x.top = element_text(size = 8.5, face = "italic"))
+
+  ggsave("gap_prob_curves_2023.png",
+         gap_curve_plot,
+         device = "png",
+         path = "WAprevalence/output/maps",
+         width = 7.5,
+         height = 5.5,
+         bg = "white")
 
 # COMPUTE SPATIAL CROSS CORRELATION USING LOCAL MORAN'S I #
 
