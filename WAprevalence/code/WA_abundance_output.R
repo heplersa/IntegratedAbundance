@@ -16,7 +16,6 @@ library(biscale) # create biscale plots
 library(cowplot) # draw_plot
 library(spatialEco) # crossCorrelation
 library(spdep)
-library(readxl)
 
 # IMPORT PRE-PROCESSED DATA USED TO FIT MODEL. 
 load("WAprevalence/data/data_for_analysis.Rda")
@@ -955,6 +954,28 @@ ggsave(filename = "N.png",
          height = 5.5,
          bg = "white")
 
+# COMPUTE ESTIMATED NUMBER OF PWUO-HR NOT RECEIVING BUPRENORPHINE #
+
+  # posterior of N minus the observed count of persons receiving buprenorphine;
+  # the binomial likelihood guarantees N >= the observed count in every draw
+  untreated_draws <- sweep(samples[, paste0("N[", 1:273, "]")], 2, yfit$pmp, "-")
+
+  # same quantity as a proportion of the PWUO-HR population, per draw
+  untreated_prop_draws <- untreated_draws/samples[, paste0("N[", 1:273, "]")]
+
+  untreated_csv <- tibble(county = yfit$county,
+                          year = yfit$year,
+                          mean = colMeans(untreated_draws),
+                          lwr95 = apply(untreated_draws, 2, quantile, probs = .025),
+                          upr95 = apply(untreated_draws, 2, quantile, probs = .975),
+                          prop_mean = colMeans(untreated_prop_draws),
+                          prop_lwr95 = apply(untreated_prop_draws, 2, quantile, probs = .025),
+                          prop_upr95 = apply(untreated_prop_draws, 2, quantile, probs = .975))
+
+  write.csv(untreated_csv,
+            file = "WAprevalence/output/tables/pwuohr_without_bup.csv",
+            row.names = F)
+
 # COMPUTE SPATIAL CROSS CORRELATION USING LOCAL MORAN'S I #
 
    # pair prevalence estimates w/ buprenorphine estimates
@@ -1072,140 +1093,4 @@ ggsave(filename = "N.png",
           height = 10,
           units = "cm",
           bg = "white")
-   
-# EXAMINE MEDICAID DATA ON MOUD FOR BUPRENORPHINE ESTIMATE QUALITY CONTROL #
-# POPULATION: MEDICAID ENROLLEES WITH OUD IN WA FROM 2018-2024 #
-  
-  # import raw data
-  medicaid_moud <- read_excel("WAprevalence/data/MAT_ResultsHCA_202409_ewa_smsuppressed.xlsx")
-  
-  # simplify data for QC purpose
-  medicaid_moud_clean <- medicaid_moud %>%
-    mutate(buprenorphine_naloxone = as.numeric(`Treatment of Medicaid enrollees with OUD with buprenorphine-naloxone`),
-           buprenorphine = as.numeric(`Treatment of Medicaid enrollees with OUD with buprenorphine`)
-    ) %>%
-    separate_wider_delim(clndr_qtr, delim = "Q", names = c("year", "quarter")) %>%
-    filter(!(county %in% c("ACH WIDE", "STATE WIDE"))) %>%
-    select(year, quarter, county, buprenorphine_naloxone, buprenorphine)
 
-  # visualize data 
-  
-    # merge in county spatial info and generate map of medicaid data
-    map_medicaid_data <- function(outcome) {
-      
-      shape_county_WA %>%
-      rename(county = NAME) %>%
-      left_join(medicaid_moud_clean, by = c("county")) %>%
-      ggplot() +
-      geom_sf(aes(fill = {{outcome}})) +
-      scale_fill_gradient(low = "white",
-                          high = "red",
-                          guide = guide_colorbar(barheight = 12)) +
-      labs(fill = NULL) +
-      theme_map() +
-      theme(legend.position = "right") +
-      facet_wrap(~year + quarter, nrow = 9, ncol = 4) +
-      theme(strip.background = element_rect(fill = "white", color = NA),
-            strip.text = element_text(color = "black",
-                                      size = 12, 
-                                      hjust = 0),
-            legend.text = element_text(size = 12),
-            legend.title = element_text(size = 12)
-      )
-      
-    }
-    
-    # generate maps
-    buprenorphine_naloxone_map <- map_medicaid_data(buprenorphine_naloxone)
-    buprenorphine_map <- map_medicaid_data(buprenorphine)
-    
-    # save maps
-    ggsave("medicaid_moud_buprenorphine_naloxone_county.png",
-           buprenorphine_naloxone_map,
-           device="png",
-           path="WAprevalence/output/maps",
-           width = 15,
-           height = 20,
-           units = "cm",
-           bg = "white")
-    
-    ggsave("medicaid_moud_buprenorphine_county.png",
-           buprenorphine_map,
-           device="png",
-           path="WAprevalence/output/maps",
-           width = 15,
-           height = 20,
-           units = "cm",
-           bg = "white")
-    
-    # examine county-level trends via facet-wrap
-    county_trend_medicaid_data <- function(outcome) {
-      
-      medicaid_moud_clean %>%
-        mutate(across(c(year, quarter), as.numeric),
-               date = ymd(paste(year, (quarter - 1)*3 + 1, 1, sep ="-"))) %>%
-        ggplot(aes(x = date, y = {{outcome}})) +
-        geom_line(alpha = 0.5) +
-        facet_wrap(~county) +  
-        theme_classic()
-      
-    }
-    
-    # generate county time trends
-    county_trend_buprenorphine_naloxone <- county_trend_medicaid_data(buprenorphine_naloxone)
-    county_trend_buprenorphine <- county_trend_medicaid_data(buprenorphine)
-    
-    # save county time trends
-    ggsave("medicaid_moud_buprenorphine_naloxone_county_trend.png",
-           county_trend_buprenorphine_naloxone,
-           device="png",
-           path="WAprevalence/output/maps",
-           width = 30,
-           height = 20,
-           units = "cm",
-           bg = "white")
-    
-    ggsave("medicaid_moud_buprenorphine_county_trend.png",
-           county_trend_buprenorphine,
-           device="png",
-           path="WAprevalence/output/maps",
-           width = 30,
-           height = 20,
-           units = "cm",
-           bg = "white")
-    
-    # examine state-level trends
-    state_trend_medicaid_data <- function(outcome) {
-      
-      medicaid_moud %>%
-        mutate(buprenorphine_naloxone = as.numeric(`Treatment of Medicaid enrollees with OUD with buprenorphine-naloxone`),
-               buprenorphine = as.numeric(`Treatment of Medicaid enrollees with OUD with buprenorphine`)
-        ) %>%
-        filter(county == "STATE WIDE") %>%
-        separate_wider_delim(clndr_qtr, delim = "Q", names = c("year", "quarter")) %>%
-        mutate(across(c(year, quarter), as.numeric),
-               date = ymd(paste(year, (quarter - 1)*3 + 1, 1, sep ="-"))) %>%
-        ggplot(aes(x = date, y = {{outcome}})) +
-        geom_line() +
-        theme_classic()
-      
-    }
-    
-    # generate state time trends
-    state_trend_buprenorphine_naloxone <- state_trend_medicaid_data(buprenorphine_naloxone)
-    state_trend_buprenorphine <- state_trend_medicaid_data(buprenorphine)
-    
-    # save state time trends
-    ggsave("medicaid_moud_buprenorphine_naloxone_state_trend.png",
-           state_trend_buprenorphine_naloxone,
-           device="png",
-           path="WAprevalence/output/maps",
-           units = "cm",
-           bg = "white")
-    
-    ggsave("medicaid_moud_buprenorphine_state_trend.png",
-           state_trend_buprenorphine,
-           device="png",
-           path="WAprevalence/output/maps",
-           units = "cm",
-           bg = "white")
