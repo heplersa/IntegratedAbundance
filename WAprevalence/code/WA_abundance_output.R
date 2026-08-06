@@ -14,9 +14,6 @@ library(tigris) # pull shape files from internet
 library(flextable) # make pretty tables
 library(biscale) # create biscale plots
 library(cowplot) # draw_plot
-library(spatialEco) # crossCorrelation
-library(spdep)
-library(readxl)
 
 # IMPORT PRE-PROCESSED DATA USED TO FIT MODEL. 
 load("WAprevalence/data/data_for_analysis.Rda")
@@ -189,6 +186,28 @@ write.csv(N_prev_results_csv,
           file = "WAprevalence/output/tables/N_prev_results.csv",
           row.names = F)
 
+# CREATE STATE-WIDE PREVALENCE TABLE FOR MANUSCRIPT
+
+  # prevalence column is the posterior for mu; PWUO-HR column sums the county-level estimates
+  statewide_prevalence_table <- N_results %>%
+                                  group_by(year) %>%
+                                  summarise(N_est = sum(mean),
+                                            pop = sum(pop)) %>%
+                                  mutate(prev = 100*results[[1]][mu_lwr:mu_upr],
+                                         lwr95 = 100*results[[2]][1, mu_lwr:mu_upr],
+                                         upr95 = 100*results[[2]][2, mu_lwr:mu_upr]) %>%
+                                  transmute(Year = year,
+                                            `Prevalence % (95% CrI)` = sprintf("%.2f (%.2f, %.2f)", prev, lwr95, upr95),
+                                            `Estimated PWUO-HR` = format(round(N_est), big.mark = ","),
+                                            `Population 12+` = format(pop, big.mark = ","))
+
+  write.csv(statewide_prevalence_table,
+            file = "WAprevalence/output/tables/statewide_prevalence_table.csv",
+            row.names = F)
+
+  save_as_docx(autofit(flextable(statewide_prevalence_table)),
+               path = "WAprevalence/output/tables/statewide_prevalence_table.docx")
+
 # EXAMINE MODIFIED GELMAN-RUBIN (GR) STATISTICS FOR SELECT PARAMETERS
 
   # exclude 2017-2018 for ED outcome as these were not modeled and therefore not sampled
@@ -277,11 +296,11 @@ create_choropleth_map <- function(data, value, colorbar_type = NULL, colorbar_ti
 
 # generate and save maps
 
-  # observed maps
-  pmp_obs_rate_map <-  create_choropleth_map(data = pmp_results, value = pmp_obs_rate, colorbar_type = "monotonic")
-  death_obs_rate_map <-  create_choropleth_map(data = death_results, value = death_obs_rate, colorbar_type = "monotonic")
-  ed_obs_rate_map <-  create_choropleth_map(data = ed_results, value = ed_obs_rate, colorbar_type = "monotonic")
-  hosp_obs_rate_map <-  create_choropleth_map(data = hosp_results, value = hosp_obs_rate, colorbar_type = "monotonic")
+  # observed maps; rates displayed per 100,000 population aged 12+
+  pmp_obs_rate_map <-  create_choropleth_map(data = pmp_results %>% mutate(pmp_obs_rate = 1e5*pmp_obs_rate), value = pmp_obs_rate, colorbar_type = "monotonic", colorbar_title = "Rate per\n100,000")
+  death_obs_rate_map <-  create_choropleth_map(data = death_results %>% mutate(death_obs_rate = 1e5*death_obs_rate), value = death_obs_rate, colorbar_type = "monotonic", colorbar_title = "Rate per\n100,000")
+  ed_obs_rate_map <-  create_choropleth_map(data = ed_results %>% mutate(ed_obs_rate = 1e5*ed_obs_rate), value = ed_obs_rate, colorbar_type = "monotonic", colorbar_title = "Rate per\n100,000")
+  hosp_obs_rate_map <-  create_choropleth_map(data = hosp_results %>% mutate(hosp_obs_rate = 1e5*hosp_obs_rate), value = hosp_obs_rate, colorbar_type = "monotonic", colorbar_title = "Rate per\n100,000")
   
   # model maps
   pmp_map <- create_choropleth_map(data = pmp_results, value = mean, colorbar_type = "monotonic")
@@ -372,13 +391,40 @@ ggsave(filename = "lambda_CrI.png",
        height = 3,
        width = 10)
 
-ggsave(filename = "N.png", 
-       plot = N_map, 
-       path = "WAprevalence/output/maps", 
+ggsave(filename = "N.png",
+       plot = N_map,
+       path = "WAprevalence/output/maps",
        bg = "White",
        dpi = "retina",
        height = 3,
        width = 10)
+
+# CREATE COMPARISON MAP OF OBSERVED DEATH RATE FOR POP VS FOR PWMO IN 2023 #
+
+  # compute county-level death rate for pop and for PWMO
+  death_rate_data <- N_results %>%
+    select(county,
+           year,
+           pop,
+           mean) %>%
+    rename(N_est = mean) %>%
+    mutate(death = yfit$death,
+           death_rate_pop = death/pop,
+           death_rate_PWMO = death/N_est)
+
+  # compute the statewide observed death rate for pop and for PWMO in 2023
+  state_wide_death_rate <- death_rate_data %>%
+    filter(year == 2023) %>%
+    summarise(pop_rate = sum(death)/sum(pop),
+              PWMO_rate = sum(death)/sum(N_est))
+
+  write.csv(death_rate_data,
+            file = "WAprevalence/output/tables/death_rate_data.csv",
+            row.names = F)
+
+  write.csv(state_wide_death_rate,
+            file = "WAprevalence/output/tables/state_wide_death_rate.csv",
+            row.names = F)
 
 # EXAMINE ESTIMATED TIME-VARYING INTERCEPTS FOR EACH OUTCOME
 
@@ -411,17 +457,23 @@ ggsave(filename = "N.png",
                             cbind(post_binom_outcome_prev[[2]], matrix(c(NA, NA, NA, NA), nrow=2, ncol=2), post_pois_outcome_prev[[2]]))
   
   # specify outcomes name and size
-  outcomes <- c("Buprenorphine prescription", 
-                "Death due to opioid misuse",
-                "ED visit due to opioid misuse",
-                "Hospitalization due to opioid misuse"
+  outcomes <- c("Buprenorphine receipt",
+                "Overdose death",
+                "ED visit",
+                "Hospitalization"
   )
+
+  # colorblind-safe palette (Okabe-Ito); overlapping death/hosp series get the most distinct pair
+  outcome_cols <- c("Buprenorphine receipt" = "#009E73",
+                    "Overdose death" = "#0072B2",
+                    "ED visit" = "#CC79A7",
+                    "Hospitalization" = "#D55E00")
   
   K <- length(outcomes)
        
   # estimated prevalence among PWMO (binomial outcomes) & rate per-person among PWMO (poisson)
   # y-axis ticks mapped ot underlying prevalence or rate value
-  tibble(pred_beta = post_outcome_prev[[1]],
+  outcome_trend_plot <- tibble(pred_beta = post_outcome_prev[[1]],
          lwr95 = post_outcome_prev[[2]][1, ],
          upr95 = post_outcome_prev[[2]][2, ],
          year = rep(2017:2023, K),
@@ -429,11 +481,13 @@ ggsave(filename = "N.png",
     ) %>%
       mutate(across(c(pred_beta, lwr95, upr95), log)) %>%
       ggplot(aes(x = year, y = pred_beta, fill = outcome)) +
-      geom_point(aes(color = outcome)) +
+      geom_point(aes(color = outcome, shape = outcome)) +
       geom_errorbar(aes(ymin = lwr95, ymax = upr95, color = outcome),
                     width = 0.05) +
       geom_line(linetype = "dashed", aes(color = outcome)) +
       geom_ribbon(aes(ymin = lwr95, ymax = upr95), alpha = 0.1) +
+      scale_color_manual(values = outcome_cols) +
+      scale_fill_manual(values = outcome_cols) +
       scale_y_continuous(
                          breaks = c(-10:0),
                          labels = round(c(0, exp(-9:0)), 3)
@@ -442,13 +496,17 @@ ggsave(filename = "N.png",
                         #                     breaks = c(-6:0), 
                         #                     labels = round(c(exp(-6), exp(-5), exp(-4), exp(-3), exp(-2), exp(-1), exp(0)), 2))
       ) +
-      theme_classic() +
+      theme_bw(base_size = 11) +
+      theme(panel.grid = element_blank(),
+            axis.text = element_text(color = "black", size = 8.5)) +
       labs(color = "Outcome",
            fill = "Outcome",
+           shape = "Outcome",
            x = "Year",
-           y = "Estimated prevalence")
+           y = "Statewide rate among PWUO-HR")
   
   ggsave(filename = "beta_log.png",
+         plot = outcome_trend_plot,
          path = "WAprevalence/output",
          dpi = "retina",
          width = 13,
@@ -496,7 +554,7 @@ ggsave(filename = "N.png",
   upr95_aggr <- CrI_aggr %>% slice(2) %>% unlist()
   
   # plot model estimate against NSDUH
-  tibble(pred_mu_aggr = pred_mu_aggr,
+  mu_trend_plot <- tibble(pred_mu_aggr = pred_mu_aggr,
          lwr95_aggr = lwr95_aggr,
          upr95_aggr = upr95_aggr,
          year = 2017:2022
@@ -516,353 +574,428 @@ ggsave(filename = "N.png",
                 fill = "light blue",
                 alpha = 0.5) +
     labs(x = "Year",
-         y = "Statewide Prevalence of PWMO") +
+         y = "Statewide prevalence of PWUO-HR") +
     scale_color_manual(name = "", values = c("NSDUH Data" = "black", "Model" = "blue")) +
-    theme_classic()
+    theme_bw(base_size = 11) +
+    theme(panel.grid = element_blank(),
+          axis.text = element_text(color = "black", size = 8.5))
   
   ggsave("2_yr_mu_trend.png",
+         mu_trend_plot,
          device="png",
          path="WAprevalence/output",
          width = 12,
          height = 10,
          units = "cm")
 
-# CREATE BISCALE PLOT #
+# CREATE PAIRED STATE-LEVEL FIGURE FOR MANUSCRIPT #
 
-  # prepare data
-  prev_pmp_data <-  N_results %>%
-    select(county,
-           year,
-           mean_prev) %>%
-    left_join(pmp_results,
-              by = c("county", "year")) %>%
-    select(county,
-           year,
-           mean_prev,
-           mean) %>%
-    rename(prev_est = mean_prev,
-           pmp_est = mean)
-  
-  # for a given year, combine model estimates w/ spatial info & apply bi_class  
-  biscale_data_year <- function(year) {
-    
-     shape_county_WA %>%
+  # survey fit alongside the state-wide outcome rates
+  state_pair_plot <- plot_grid(mu_trend_plot +
+                                 theme(legend.position = c(0.76, 0.88),
+                                       legend.background = element_blank()),
+                               outcome_trend_plot,
+                               labels = c("A)", "B)"),
+                               label_size = 11,
+                               rel_widths = c(0.44, 0.56))
+
+  ggsave("state_level_pair.png",
+         state_pair_plot,
+         path = "WAprevalence/output",
+         dpi = "retina",
+         width = 26,
+         height = 10,
+         units = "cm",
+         bg = "white")
+
+# CREATE COUNTY TREND FIGURE FOR MANUSCRIPT #
+
+  # stack prevalence and the four outcome rates; ED visits are only estimated from 2019
+  trend_data <- bind_rows(N_results %>% transmute(county, year, est = mean_prev, panel = "A) Prevalence of higher-risk opioid use"),
+                          pmp_results %>% transmute(county, year, est = mean, panel = "B) Buprenorphine rate among PWUO-HR"),
+                          death_results %>% transmute(county, year, est = mean, panel = "C) Overdose death rate among PWUO-HR"),
+                          ed_results %>% transmute(county, year, est = mean, panel = "D) ED visit rate among PWUO-HR"),
+                          hosp_results %>% transmute(county, year, est = mean, panel = "E) Hospitalization rate among PWUO-HR"))
+
+  # label the highest and lowest county in each panel's final year
+  trend_labels <- trend_data %>%
+                    filter(!is.na(est)) %>%
+                    group_by(panel) %>%
+                    filter(year == max(year)) %>%
+                    filter(est == max(est) | est == min(est)) %>%
+                    ungroup()
+
+  # draw the labeled counties in black over the remaining counties in grey
+  trend_highlight <- trend_data %>%
+                       semi_join(trend_labels, by = c("panel", "county"))
+
+  county_trend_plot <- trend_data %>%
+                        ggplot(aes(x = year, y = est, group = county)) +
+                        geom_line(linewidth = 0.3, color = "grey75") +
+                        geom_line(data = trend_highlight, linewidth = 0.5) +
+                        geom_text(aes(label = str_to_title(county)),
+                                  data = trend_labels,
+                                  hjust = -0.08,
+                                  size = 2.3) +
+                        facet_wrap(~panel, scales = "free_y", ncol = 3) +
+                        coord_cartesian(clip = "off") + # county labels sit outside the panel
+                        scale_x_continuous(breaks = seq(2017, 2023, 2),
+                                           expand = expansion(mult = c(0.03, 0.32))) +
+                        labs(x = "Year", y = NULL) +
+                        theme_bw(base_size = 11) +
+                        theme(panel.grid = element_blank(),
+                              strip.background = element_blank(),
+                              strip.text = element_text(color = "black", size = 8.5, hjust = 0),
+                              axis.text = element_text(color = "black", size = 8.5),
+                              panel.spacing = unit(1.2, "lines"))
+
+  ggsave("trend_spaghetti.png",
+         county_trend_plot,
+         device = "png",
+         path = "WAprevalence/output/maps",
+         width = 11,
+         height = 6.8,
+         bg = "white")
+
+# CREATE RATE DENOMINATOR COMPARISON FIGURE FOR MANUSCRIPT #
+
+  # each outcome rate expressed per 100,000 population and per 100 PWUO-HR
+  denominator_data <- bind_rows(pmp_results %>% mutate(outcome = "Buprenorphine"),
+                                death_results %>% mutate(outcome = "Overdose death"),
+                                ed_results %>% mutate(outcome = "ED visits"),
+                                hosp_results %>% mutate(outcome = "Hospitalizations")) %>%
+                        left_join(N_results %>% select(county, year, N_est = mean),
+                                  by = c("county", "year")) %>%
+                        filter(!is.na(mean)) %>%
+                        transmute(county,
+                                  year,
+                                  outcome,
+                                  `per 100,000 population 12+` = 10^5*mean*N_est/pop,
+                                  `per 100 PWUO-HR` = 100*mean) %>%
+                        pivot_longer(starts_with("per"),
+                                     names_to = "denominator",
+                                     values_to = "rate")
+
+  # panel order: one outcome per row, population denominator on the left
+  panel_order <- expand_grid(outcome = c("Buprenorphine", "Overdose death", "ED visits", "Hospitalizations"),
+                             denominator = c("per 100,000 population 12+", "per 100 PWUO-HR")) %>%
+                   mutate(panel = paste0(LETTERS[1:8], ") ", outcome, " ", denominator))
+
+  denominator_plot <- denominator_data %>%
+                        left_join(panel_order, by = c("outcome", "denominator")) %>%
+                        mutate(panel = factor(panel, levels = panel_order$panel)) %>%
+                        ggplot(aes(x = factor(year), y = rate)) +
+                        geom_boxplot(linewidth = 0.3, outlier.size = 0.5, fill = "grey92") +
+                        facet_wrap(~panel, scales = "free_y", ncol = 2) +
+                        labs(x = "Year", y = NULL) +
+                        theme_bw(base_size = 10) +
+                        theme(panel.grid = element_blank(),
+                              strip.background = element_blank(),
+                              strip.text = element_text(color = "black", size = 8.5, hjust = 0),
+                              axis.text = element_text(color = "black", size = 7.5),
+                              panel.spacing = unit(0.8, "lines"))
+
+  ggsave("rate_denominator_boxplots.png",
+         denominator_plot,
+         device = "png",
+         path = "WAprevalence/output/maps",
+         width = 8,
+         height = 9.5,
+         bg = "white")
+
+# CREATE BISCALE PLOTS #
+
+  # pair prevalence estimates w/ estimates for a given outcome
+  prev_outcome_data <- function(outcome_results) {
+
+    N_results %>%
+      select(county,
+             year,
+             mean_prev) %>%
+      left_join(outcome_results,
+                by = c("county", "year")) %>%
+      select(county,
+             year,
+             mean_prev,
+             mean) %>%
+      rename(prev_est = mean_prev,
+             outcome_est = mean)
+
+  }
+
+  # for a given year, combine model estimates w/ spatial info & apply bi_class
+  biscale_data_year <- function(data, year) {
+
+     data_year <- shape_county_WA %>%
             mutate(NAME = tolower(NAME)) %>%
             rename(county = NAME) %>%
-            left_join(prev_pmp_data[prev_pmp_data$year==year,],
-                      by = c("county")) %>%
-            bi_class(x = prev_est, 
-                     y = pmp_est,
+            left_join(data[data$year==year,],
+                      by = c("county"))
+
+     # years w/ no outcome estimates (ED visits in 2017-2018) are mapped as missing
+     if(all(is.na(data_year$outcome_est))) {
+
+       data_year %>% mutate(bi_class = NA)
+
+     } else {
+
+       data_year %>%
+            bi_class(x = prev_est,
+                     y = outcome_est,
                      style = "quantile",
                      dim = 4)
-    
-    
-    
+
+     }
+
   }
-  
-  # create biscale class variable for each year
-  biscale_data_2017 <- biscale_data_year(2017)
-  biscale_data_2018 <- biscale_data_year(2018)
-  biscale_data_2019 <- biscale_data_year(2019)
-  biscale_data_2020 <- biscale_data_year(2020)
-  biscale_data_2021 <- biscale_data_year(2021)
-  biscale_data_2022 <- biscale_data_year(2022)
-  biscale_data_2023 <- biscale_data_year(2023)
 
-  # stack data
-  biscale_data <- biscale_data_2017 %>%
-                    bind_rows(biscale_data_2018,
-                              biscale_data_2019,
-                              biscale_data_2020,
-                              biscale_data_2021,
-                              biscale_data_2022,
-                              biscale_data_2023)
+  # create and save biscale plot of prevalence vs a given outcome
+  create_biscale_plot <- function(outcome_results, outcome_label, filename) {
 
-  # create biscale plot
-  biscale_legend <- bi_legend(pal = "GrPink2",
-                              dim = 4,
-                              xlab = "Prevalence",
-                              ylab = "Buprenorphine",
-                              size = 5)
-  
-  biscale_map <- biscale_data %>%
-                    ggplot() +
-                    geom_sf(aes(fill = bi_class), 
-                            color = "white",
-                            size = 0.1, 
-                            show.legend = F) +
-                      bi_scale_fill(pal = "GrPink2", dim = 4) +
-                      facet_wrap(~year, nrow = 2, ncol = 4) +
-                      theme_map() +
-                      theme(strip.background = element_rect(fill = "white", color = NA),
-                            strip.text = element_text(color = "black",
-                                                      size = 7.5, 
-                                                      hjust = 0),
-                            legend.text = element_text(size = 12),
-                            legend.title = element_text(size = 12)
-                      )
-   
-   ggdraw() +
-     draw_plot(biscale_map, 0, 0, 1, 1) +
-     draw_plot(biscale_legend, 0.77, .26, 0.2, 0.2) 
-     #draw_plot(biscale_legend, 0.4, .8, 0.2, 0.2) 
-   
-   ggsave("biplot_4dim.png",
-          device="png",
-          path="WAprevalence/output/maps",
-          width = 12,
-          height = 10,
-          units = "cm",
-          bg = "white")
-   
-# COMPUTE SPATIAL CROSS CORRELATION USING LOCAL MORAN'S I #
+    data <- prev_outcome_data(outcome_results)
 
-   # compute adjacency matrix for NC counties
-   WA_map <- shape_county_WA[order(shape_county_WA$COUNTYFP),] #convert to data frame
-   
-   nbmat <- poly2nb(WA_map)
-   
-   n <- length(shape_county_WA$NAME) # should be 39
-   
-   A <- matrix(0,n,n)
-   
-   for(i in 1:n){
-     
-     A[i,unlist(nbmat[[i]])]=1
-     
-   }
-   
-  # compute Moran's I for a given year of the data
-  crossCorrelation_year <- function(year) {
-    
-    crossCorrelation_data <- prev_pmp_data[prev_pmp_data$year == year,]
-    prev_est <- crossCorrelation_data %>% pull(prev_est)
-    pmp_est <- crossCorrelation_data %>% pull(pmp_est)
-    
-    crossCorrelation(prev_est,
-                     pmp_est,
-                     w = A,
-                     dist.function = "none")
-    
+    # create biscale class variable for each year and stack
+    biscale_data <- biscale_data_year(data, 2017) %>%
+                      bind_rows(biscale_data_year(data, 2018),
+                                biscale_data_year(data, 2019),
+                                biscale_data_year(data, 2020),
+                                biscale_data_year(data, 2021),
+                                biscale_data_year(data, 2022),
+                                biscale_data_year(data, 2023))
+
+    # create biscale plot
+    biscale_legend <- bi_legend(pal = "GrPink2",
+                                dim = 4,
+                                xlab = "Prevalence",
+                                ylab = outcome_label,
+                                size = 5)
+
+    biscale_map <- biscale_data %>%
+                      ggplot() +
+                      geom_sf(aes(fill = bi_class),
+                              color = "white",
+                              size = 0.1,
+                              show.legend = F) +
+                        bi_scale_fill(pal = "GrPink2", dim = 4) +
+                        facet_wrap(~year, nrow = 2, ncol = 4) +
+                        theme_map() +
+                        theme(strip.background = element_rect(fill = "white", color = NA),
+                              strip.text = element_text(color = "black",
+                                                        size = 7.5,
+                                                        hjust = 0),
+                              legend.text = element_text(size = 12),
+                              legend.title = element_text(size = 12)
+                        )
+
+     # legend occupies the empty facet slot
+     ggdraw() +
+       draw_plot(biscale_map, 0, 0, 1, 1) +
+       draw_plot(biscale_legend, 0.77, 0, 0.22, 0.528)
+
+     ggsave(filename,
+            device="png",
+            path="WAprevalence/output/maps",
+            width = 12,
+            height = 5,
+            units = "cm",
+            bg = "white")
+
   }
-   
-   # save crossCorrelation values
-   crossCorrelation_2017 <- crossCorrelation_year(2017)
-   crossCorrelation_2018 <- crossCorrelation_year(2018)
-   crossCorrelation_2019 <- crossCorrelation_year(2019)
-   crossCorrelation_2020 <- crossCorrelation_year(2020)
-   crossCorrelation_2021 <- crossCorrelation_year(2021)
-   crossCorrelation_2022 <- crossCorrelation_year(2022)
-   crossCorrelation_2023 <- crossCorrelation_year(2023)
- 
-  # extract clusters and put into data frame
-   cluster_data <- function(data, year) {
-     
-     prev_pmp_data_year <- prev_pmp_data[prev_pmp_data$year==year,] %>%
-       mutate(cluster = data$clusters,
-              bi_class = case_when(
-                cluster == "Low.Low" ~ "1-1",
-                cluster == "Low.High" ~ "1-2",
-                cluster == "High.Low" ~ "2-1",
-                cluster == "High.High" ~ "2-2"
-               )
-              )
-     
-     shape_county_WA %>%
-       mutate(NAME = tolower(NAME)) %>%
-       rename(county = NAME) %>%
-       left_join(prev_pmp_data_year,
-                 by = c("county"))
-   
-   }
-   
-   # extract tidy cluster data for each year
-   cluster_data_2017 <- cluster_data(crossCorrelation_2017, 2017)
-   cluster_data_2018 <- cluster_data(crossCorrelation_2018, 2018)
-   cluster_data_2019 <- cluster_data(crossCorrelation_2019, 2019)
-   cluster_data_2020 <- cluster_data(crossCorrelation_2020, 2020)
-   cluster_data_2021 <- cluster_data(crossCorrelation_2021, 2021)
-   cluster_data_2022 <- cluster_data(crossCorrelation_2022, 2022)
-   cluster_data_2023 <- cluster_data(crossCorrelation_2023, 2023)
-   
-   # stack data
-   cluster_data <- cluster_data_2017 %>%
-                      bind_rows(cluster_data_2018,
-                                cluster_data_2019,
-                                cluster_data_2020,
-                                cluster_data_2021,
-                                cluster_data_2022,
-                                cluster_data_2023)
-   
-   # create biscale plot using cluster from crossCorrelation
-   cluster_legend <- bi_legend(pal = "GrPink",
-                               dim = 2,
-                               xlab = "Prevalence",
-                               ylab = "Buprenorphine",
-                               size = 5)
-   
-   cluster_map <- cluster_data %>%
-     ggplot() +
-     geom_sf(aes(fill = bi_class), 
-             color = "white",
-             size = 0.1, 
-             show.legend = F) +
-     bi_scale_fill(pal = "GrPink", dim = 2) +
-     facet_wrap(~year, nrow=2, ncol =4) +
-     theme_map() +
-     theme(strip.background = element_rect(fill = "white", color = NA),
-           strip.text = element_text(color = "black",
-                                     size = 12, 
-                                     hjust = 0),
-           legend.text = element_text(size = 12),
-           legend.title = element_text(size = 12)
-     )
-   
-   ggdraw() +
-     draw_plot(cluster_map, 0, 0, 1, 1) +
-     draw_plot(cluster_legend, 0.4, .8, 0.2, 0.2) 
-   
-   ggsave("crossCorr_biplot_2dim.png",
-          device="png",
-          path="WAprevalence/output/maps",
-          width = 12,
-          height = 10,
-          units = "cm",
-          bg = "white")
-   
-# EXAMINE MEDICAID DATA ON MOUD FOR BUPRENORPHINE ESTIMATE QUALITY CONTROL #
-# POPULATION: MEDICAID ENROLLEES WITH OUD IN WA FROM 2018-2024 #
-  
-  # import raw data
-  medicaid_moud <- read_excel("WAprevalence/data/MAT_ResultsHCA_202409_ewa_smsuppressed.xlsx")
-  
-  # simplify data for QC purpose
-  medicaid_moud_clean <- medicaid_moud %>%
-    mutate(buprenorphine_naloxone = as.numeric(`Treatment of Medicaid enrollees with OUD with buprenorphine-naloxone`),
-           buprenorphine = as.numeric(`Treatment of Medicaid enrollees with OUD with buprenorphine`)
-    ) %>%
-    separate_wider_delim(clndr_qtr, delim = "Q", names = c("year", "quarter")) %>%
-    filter(!(county %in% c("ACH WIDE", "STATE WIDE"))) %>%
-    select(year, quarter, county, buprenorphine_naloxone, buprenorphine)
 
-  # visualize data 
-  
-    # merge in county spatial info and generate map of medicaid data
-    map_medicaid_data <- function(outcome) {
-      
-      shape_county_WA %>%
-      rename(county = NAME) %>%
-      left_join(medicaid_moud_clean, by = c("county")) %>%
-      ggplot() +
-      geom_sf(aes(fill = {{outcome}})) +
-      scale_fill_gradient(low = "white",
-                          high = "red",
-                          guide = guide_colorbar(barheight = 12)) +
-      labs(fill = NULL) +
-      theme_map() +
-      theme(legend.position = "right") +
-      facet_wrap(~year + quarter, nrow = 9, ncol = 4) +
-      theme(strip.background = element_rect(fill = "white", color = NA),
-            strip.text = element_text(color = "black",
-                                      size = 12, 
-                                      hjust = 0),
-            legend.text = element_text(size = 12),
-            legend.title = element_text(size = 12)
-      )
-      
-    }
-    
-    # generate maps
-    buprenorphine_naloxone_map <- map_medicaid_data(buprenorphine_naloxone)
-    buprenorphine_map <- map_medicaid_data(buprenorphine)
-    
-    # save maps
-    ggsave("medicaid_moud_buprenorphine_naloxone_county.png",
-           buprenorphine_naloxone_map,
-           device="png",
-           path="WAprevalence/output/maps",
-           width = 15,
-           height = 20,
-           units = "cm",
-           bg = "white")
-    
-    ggsave("medicaid_moud_buprenorphine_county.png",
-           buprenorphine_map,
-           device="png",
-           path="WAprevalence/output/maps",
-           width = 15,
-           height = 20,
-           units = "cm",
-           bg = "white")
-    
-    # examine county-level trends via facet-wrap
-    county_trend_medicaid_data <- function(outcome) {
-      
-      medicaid_moud_clean %>%
-        mutate(across(c(year, quarter), as.numeric),
-               date = ymd(paste(year, (quarter - 1)*3 + 1, 1, sep ="-"))) %>%
-        ggplot(aes(x = date, y = {{outcome}})) +
-        geom_line(alpha = 0.5) +
-        facet_wrap(~county) +  
-        theme_classic()
-      
-    }
-    
-    # generate county time trends
-    county_trend_buprenorphine_naloxone <- county_trend_medicaid_data(buprenorphine_naloxone)
-    county_trend_buprenorphine <- county_trend_medicaid_data(buprenorphine)
-    
-    # save county time trends
-    ggsave("medicaid_moud_buprenorphine_naloxone_county_trend.png",
-           county_trend_buprenorphine_naloxone,
-           device="png",
-           path="WAprevalence/output/maps",
-           width = 30,
-           height = 20,
-           units = "cm",
-           bg = "white")
-    
-    ggsave("medicaid_moud_buprenorphine_county_trend.png",
-           county_trend_buprenorphine,
-           device="png",
-           path="WAprevalence/output/maps",
-           width = 30,
-           height = 20,
-           units = "cm",
-           bg = "white")
-    
-    # examine state-level trends
-    state_trend_medicaid_data <- function(outcome) {
-      
-      medicaid_moud %>%
-        mutate(buprenorphine_naloxone = as.numeric(`Treatment of Medicaid enrollees with OUD with buprenorphine-naloxone`),
-               buprenorphine = as.numeric(`Treatment of Medicaid enrollees with OUD with buprenorphine`)
-        ) %>%
-        filter(county == "STATE WIDE") %>%
-        separate_wider_delim(clndr_qtr, delim = "Q", names = c("year", "quarter")) %>%
-        mutate(across(c(year, quarter), as.numeric),
-               date = ymd(paste(year, (quarter - 1)*3 + 1, 1, sep ="-"))) %>%
-        ggplot(aes(x = date, y = {{outcome}})) +
-        geom_line() +
-        theme_classic()
-      
-    }
-    
-    # generate state time trends
-    state_trend_buprenorphine_naloxone <- state_trend_medicaid_data(buprenorphine_naloxone)
-    state_trend_buprenorphine <- state_trend_medicaid_data(buprenorphine)
-    
-    # save state time trends
-    ggsave("medicaid_moud_buprenorphine_naloxone_state_trend.png",
-           state_trend_buprenorphine_naloxone,
-           device="png",
-           path="WAprevalence/output/maps",
-           units = "cm",
-           bg = "white")
-    
-    ggsave("medicaid_moud_buprenorphine_state_trend.png",
-           state_trend_buprenorphine,
-           device="png",
-           path="WAprevalence/output/maps",
-           units = "cm",
-           bg = "white")
+  # create biscale plot for each outcome
+  create_biscale_plot(pmp_results, "Buprenorphine", "biplot_4dim.png")
+  create_biscale_plot(death_results, "Deaths", "biplot_4dim_death.png")
+  create_biscale_plot(ed_results, "ED Visits", "biplot_4dim_ed.png")
+  create_biscale_plot(hosp_results, "Hospitalizations", "biplot_4dim_hosp.png")
+
+# COMPUTE POSTERIOR PROBABILITY OF GAP MEMBERSHIP BY RANK THRESHOLD (PREVALENCE VS BUPRENORPHINE) #
+
+  # P(county is among the r highest-prevalence and r lowest-buprenorphine counties in a year),
+  # classified within each posterior draw and averaged over draws; r = 10 matches the biscale quartiles
+  gap_prob_year <- function(t) {
+
+    prev_draws <- sweep(samples[, paste0("N[", (t - 1)*39 + 1:39, "]")], 2,
+                        yfit$pop[yfit$year == 2016 + t], "/")
+    bup_draws <- samples[, paste0("pi[", (t - 1)*39 + 1:39, ", 1]")]
+
+    # rank each draw once; all thresholds reuse the same ranks
+    prev_ranks <- t(apply(prev_draws, 1, rank))
+    bup_ranks <- t(apply(bup_draws, 1, rank))
+
+    map_dfr(1:19, function(r) {
+      tibble(county = yfit$county[yfit$year == 2016 + t],
+             year = 2016 + t,
+             r = r,
+             p_gap = colMeans(prev_ranks >= 40 - r & bup_ranks <= r))
+    })
+
+  }
+
+  gap_probs <- map_dfr(1:7, gap_prob_year)
+
+  write.csv(gap_probs,
+            file = "WAprevalence/output/tables/gap_probability_by_threshold.csv",
+            row.names = F)
+
+  # print 2023 at the quartile-equivalent threshold for the manuscript
+  gap_probs %>%
+    filter(year == 2023, r == 10) %>%
+    arrange(desc(p_gap)) %>%
+    print(n = 10)
+
+# CREATE THRESHOLD CURVES FIGURE FOR SUPPLEMENT #
+
+  # highlight the seven counties with the highest quartile-threshold probabilities in 2023
+  gap_2023 <- gap_probs %>% filter(year == 2023)
+
+  gap_top <- gap_2023 %>%
+               filter(r == 10) %>%
+               slice_max(p_gap, n = 7) %>%
+               pull(county)
+
+  # cascade the end labels downward to avoid overlap; leader segments tie each label to its line
+  gap_labels <- gap_2023 %>%
+                  filter(r == 19, county %in% gap_top) %>%
+                  arrange(desc(p_gap)) %>%
+                  mutate(lab_y = accumulate(p_gap, function(prev, y) min(y, prev - 0.035)))
+
+  gap_curve_plot <- ggplot(gap_2023, aes(x = r, y = p_gap, group = county)) +
+                      geom_vline(xintercept = c(4, 10, 13, 19),
+                                 linetype = "dashed",
+                                 color = "grey60",
+                                 linewidth = 0.3) +
+                      geom_line(data = filter(gap_2023, !county %in% gap_top),
+                                color = "grey75",
+                                linewidth = 0.3) +
+                      geom_line(data = filter(gap_2023, county %in% gap_top),
+                                linewidth = 0.5) +
+                      geom_segment(data = gap_labels,
+                                   aes(x = 19, xend = 19.55, y = p_gap, yend = lab_y),
+                                   color = "grey50",
+                                   linewidth = 0.2) +
+                      geom_text(data = gap_labels,
+                                aes(x = 19.65, y = lab_y, label = str_to_title(county)),
+                                hjust = 0,
+                                size = 2.4) +
+                      coord_cartesian(clip = "off") +
+                      scale_x_continuous(breaks = c(1, 4, 10, 13, 19),
+                                         expand = expansion(mult = c(0.02, 0.22)),
+                                         sec.axis = dup_axis(breaks = c(4, 8, 10, 13, 19),
+                                                             labels = c("deciles", "quintiles", "quartiles", "tertiles", "halves"),
+                                                             name = "Equivalent quantile classification")) +
+                      scale_y_continuous(limits = c(0, 1)) +
+                      labs(x = "Classification threshold r (number of counties)",
+                           y = "P(among r highest-prevalence and r lowest-coverage counties)") +
+                      theme_bw(base_size = 11) +
+                      theme(panel.grid = element_blank(),
+                            axis.text = element_text(color = "black", size = 8.5),
+                            axis.text.x.top = element_text(size = 8, face = "italic"),
+                            axis.title.x.top = element_text(size = 8.5, face = "italic"))
+
+  ggsave("gap_prob_curves_2023.png",
+         gap_curve_plot,
+         device = "png",
+         path = "WAprevalence/output/maps",
+         width = 7.5,
+         height = 5.5,
+         bg = "white")
+
+# CREATE PREVALENCE VS COVERAGE SCATTER #
+
+  # posterior mean prevalence against buprenorphine rate among PWUO-HR, by year;
+  # the seven counties with the highest quartile-threshold gap probabilities are highlighted
+  scatter_data <- N_results %>%
+                    transmute(county, year, prev_pct = 100*mean_prev) %>%
+                    left_join(pmp_results %>% transmute(county, year, pmp_pct = 100*mean),
+                              by = c("county", "year")) %>%
+                    mutate(hl = county %in% gap_top)
+
+  # 2023 labels cascade down the panel's empty right side; leader segments tie them to points
+  scatter_labels <- scatter_data %>%
+                      filter(year == 2023, hl) %>%
+                      arrange(desc(pmp_pct)) %>%
+                      mutate(lab_y = accumulate(pmp_pct, function(prev, y) min(y, prev - 4)))
+
+  prev_coverage_plot <- ggplot(scatter_data, aes(x = prev_pct, y = pmp_pct)) +
+                          geom_point(data = filter(scatter_data, !hl), color = "grey60", size = 1.0) +
+                          geom_point(data = filter(scatter_data, hl), size = 1.4) +
+                          geom_segment(data = scatter_labels,
+                                       aes(x = prev_pct, xend = 5.1, y = pmp_pct, yend = lab_y),
+                                       color = "grey60", linewidth = 0.2) +
+                          geom_text(data = scatter_labels,
+                                    aes(x = 5.2, y = lab_y, label = str_to_title(county)),
+                                    hjust = 0, size = 2.3) +
+                          facet_wrap(~year, ncol = 4) +
+                          labs(x = "Estimated prevalence of higher-risk opioid use (%)",
+                               y = "Estimated buprenorphine receipt rate among PWUO-HR (%)") +
+                          theme_bw(base_size = 12) +
+                          theme(panel.grid = element_blank(),
+                                strip.background = element_blank(),
+                                strip.text = element_text(color = "black", size = 9.5, hjust = 0),
+                                axis.text = element_text(color = "black", size = 9),
+                                panel.spacing = unit(0.9, "lines"))
+
+  ggsave("prev_coverage_scatter.png",
+         prev_coverage_plot,
+         device = "png",
+         path = "WAprevalence/output/maps",
+         width = 9,
+         height = 5.2,
+         bg = "white")
+
+  # print 2023 coverage for the highest-prevalence counties and the county median for the manuscript
+  scatter_data %>%
+    filter(year == 2023) %>%
+    mutate(prev_rank = rank(-prev_pct)) %>%
+    filter(prev_rank <= 4) %>%
+    arrange(desc(prev_pct)) %>%
+    select(county, prev_pct, pmp_pct) %>%
+    print()
+
+  scatter_data %>%
+    filter(year == 2023) %>%
+    summarise(median_pmp_pct = median(pmp_pct)) %>%
+    print()
+
+# COMPUTE ESTIMATED NUMBER OF PWUO-HR NOT RECEIVING BUPRENORPHINE #
+
+  # posterior of N minus the observed count of persons receiving buprenorphine;
+  # the binomial likelihood guarantees N >= the observed count in every draw
+  untreated_draws <- sweep(samples[, paste0("N[", 1:273, "]")], 2, yfit$pmp, "-")
+
+  # same quantity as a proportion of the PWUO-HR population, per draw
+  untreated_prop_draws <- untreated_draws/samples[, paste0("N[", 1:273, "]")]
+
+  untreated_csv <- tibble(county = yfit$county,
+                          year = yfit$year,
+                          mean = colMeans(untreated_draws),
+                          lwr95 = apply(untreated_draws, 2, quantile, probs = .025),
+                          upr95 = apply(untreated_draws, 2, quantile, probs = .975),
+                          prop_mean = colMeans(untreated_prop_draws),
+                          prop_lwr95 = apply(untreated_prop_draws, 2, quantile, probs = .025),
+                          prop_upr95 = apply(untreated_prop_draws, 2, quantile, probs = .975))
+
+  write.csv(untreated_csv,
+            file = "WAprevalence/output/tables/pwuohr_without_bup.csv",
+            row.names = F)
+
+  # statewide totals and proportions summed within each draw so the CrIs reflect joint uncertainty
+  untreated_state_csv <- map_dfr(1:7, function(t) {
+
+    state_draws <- rowSums(untreated_draws[, (t - 1)*39 + 1:39])
+    N_state <- rowSums(samples[, paste0("N[", (t - 1)*39 + 1:39, "]")])
+
+    tibble(year = 2016 + t,
+           mean = mean(state_draws),
+           lwr95 = quantile(state_draws, .025),
+           upr95 = quantile(state_draws, .975),
+           prop_mean = mean(state_draws/N_state),
+           prop_lwr95 = quantile(state_draws/N_state, .025),
+           prop_upr95 = quantile(state_draws/N_state, .975))
+
+  })
+
+  write.csv(untreated_state_csv,
+            file = "WAprevalence/output/tables/pwuohr_without_bup_statewide.csv",
+            row.names = F)
+
