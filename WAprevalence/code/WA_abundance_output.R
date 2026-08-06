@@ -14,8 +14,6 @@ library(tigris) # pull shape files from internet
 library(flextable) # make pretty tables
 library(biscale) # create biscale plots
 library(cowplot) # draw_plot
-library(spatialEco) # crossCorrelation
-library(spdep)
 
 # IMPORT PRE-PROCESSED DATA USED TO FIT MODEL. 
 load("WAprevalence/data/data_for_analysis.Rda")
@@ -420,65 +418,13 @@ ggsave(filename = "N.png",
     summarise(pop_rate = sum(death)/sum(pop),
               PWMO_rate = sum(death)/sum(N_est))
 
-  # create choropleth maps (what is the right legend/scale comparison here?)
+  write.csv(death_rate_data,
+            file = "WAprevalence/output/tables/death_rate_data.csv",
+            row.names = F)
 
-  # pop rate
-  death_pop_map <- shape_county_WA %>%
-    mutate(NAME = tolower(NAME)) %>%
-    rename(county = NAME) %>%
-    left_join(death_rate_data[death_rate_data$year==2023,],
-              by = c("county")) %>%
-    ggplot() +
-    geom_sf(aes(fill = death_rate_pop)) +
-    scale_fill_gradient2(low = "blue",
-                         mid = "white",
-                         high = "red",
-                         midpoint = state_wide_death_rate$pop_rate,
-                         guide = guide_colorbar(barheight = 7.5)) +
-    labs(fill = NULL,
-         title = "Overdose death rate among population 12+") +
-    theme_map() +
-    theme(legend.position = "right",
-          legend.text = element_text(size = 12),
-          legend.title = element_text(size = 12),
-          plot.title = element_text(hjust = 0.7))
-
-  # PWMO rate
-  death_PWMO_map <- shape_county_WA %>%
-    mutate(NAME = tolower(NAME)) %>%
-    rename(county = NAME) %>%
-    left_join(death_rate_data[death_rate_data$year==2023,],
-              by = c("county")) %>%
-    ggplot() +
-    geom_sf(aes(fill = death_rate_PWMO)) +
-    scale_fill_gradient2(low = "blue",
-                         mid = "white",
-                         high = "red",
-                         midpoint = state_wide_death_rate$PWMO_rate,
-                         guide = guide_colorbar(barheight = 7.5)) +
-    labs(fill = NULL,
-         title = "Overdose deaths rate among PWUO-HR") +
-    theme_map() +
-    theme(legend.position = "right",
-          legend.text = element_text(size = 12),
-          legend.title = element_text(size = 12),
-          plot.title = element_text(hjust = 0.7))
-
-  # make it so that scientific notation is disabled, undo this via option(scipen=0)
-  options(scipen = 999)
-
-  death_rate_comparison <- plot_grid(death_pop_map, death_PWMO_map,
-                                     align = "hv",
-                                     nrow = 1,
-                                     ncol = 2)
-
-  ggsave(filename = "death_pop_vs_PWMO_2023.png",
-         plot = death_rate_comparison,
-         path = "WAprevalence/output/maps",
-         bg = "White",
-         dpi = "retina",
-         height = 3,
-         width = 11)
+  write.csv(state_wide_death_rate,
+            file = "WAprevalence/output/tables/state_wide_death_rate.csv",
+            row.names = F)
 
 # EXAMINE ESTIMATED TIME-VARYING INTERCEPTS FOR EACH OUTCOME
 
@@ -914,7 +860,7 @@ ggsave(filename = "N.png",
                   mutate(lab_y = accumulate(p_gap, function(prev, y) min(y, prev - 0.035)))
 
   gap_curve_plot <- ggplot(gap_2023, aes(x = r, y = p_gap, group = county)) +
-                      geom_vline(xintercept = c(5, 10, 13, 19),
+                      geom_vline(xintercept = c(4, 10, 13, 19),
                                  linetype = "dashed",
                                  color = "grey60",
                                  linewidth = 0.3) +
@@ -932,7 +878,7 @@ ggsave(filename = "N.png",
                                 hjust = 0,
                                 size = 2.4) +
                       coord_cartesian(clip = "off") +
-                      scale_x_continuous(breaks = c(1, 5, 10, 13, 19),
+                      scale_x_continuous(breaks = c(1, 4, 10, 13, 19),
                                          expand = expansion(mult = c(0.02, 0.22)),
                                          sec.axis = dup_axis(breaks = c(4, 8, 10, 13, 19),
                                                              labels = c("deciles", "quintiles", "quartiles", "tertiles", "halves"),
@@ -953,6 +899,63 @@ ggsave(filename = "N.png",
          width = 7.5,
          height = 5.5,
          bg = "white")
+
+# CREATE PREVALENCE VS COVERAGE SCATTER #
+
+  # posterior mean prevalence against buprenorphine rate among PWUO-HR, by year;
+  # the seven counties with the highest quartile-threshold gap probabilities are highlighted
+  scatter_data <- N_results %>%
+                    transmute(county, year, prev_pct = 100*mean_prev) %>%
+                    left_join(pmp_results %>% transmute(county, year, pmp_pct = 100*mean),
+                              by = c("county", "year")) %>%
+                    mutate(hl = county %in% gap_top)
+
+  # 2023 labels cascade down the panel's empty right side; leader segments tie them to points
+  scatter_labels <- scatter_data %>%
+                      filter(year == 2023, hl) %>%
+                      arrange(desc(pmp_pct)) %>%
+                      mutate(lab_y = accumulate(pmp_pct, function(prev, y) min(y, prev - 4)))
+
+  prev_coverage_plot <- ggplot(scatter_data, aes(x = prev_pct, y = pmp_pct)) +
+                          geom_point(data = filter(scatter_data, !hl), color = "grey60", size = 1.0) +
+                          geom_point(data = filter(scatter_data, hl), size = 1.4) +
+                          geom_segment(data = scatter_labels,
+                                       aes(x = prev_pct, xend = 5.1, y = pmp_pct, yend = lab_y),
+                                       color = "grey60", linewidth = 0.2) +
+                          geom_text(data = scatter_labels,
+                                    aes(x = 5.2, y = lab_y, label = str_to_title(county)),
+                                    hjust = 0, size = 2.3) +
+                          facet_wrap(~year, ncol = 4) +
+                          labs(x = "Estimated prevalence of higher-risk opioid use (%)",
+                               y = "Estimated buprenorphine receipt rate among PWUO-HR (%)") +
+                          theme_bw(base_size = 12) +
+                          theme(panel.grid = element_blank(),
+                                strip.background = element_blank(),
+                                strip.text = element_text(color = "black", size = 9.5, hjust = 0),
+                                axis.text = element_text(color = "black", size = 9),
+                                panel.spacing = unit(0.9, "lines"))
+
+  ggsave("prev_coverage_scatter.png",
+         prev_coverage_plot,
+         device = "png",
+         path = "WAprevalence/output/maps",
+         width = 9,
+         height = 5.2,
+         bg = "white")
+
+  # print 2023 coverage for the highest-prevalence counties and the county median for the manuscript
+  scatter_data %>%
+    filter(year == 2023) %>%
+    mutate(prev_rank = rank(-prev_pct)) %>%
+    filter(prev_rank <= 4) %>%
+    arrange(desc(prev_pct)) %>%
+    select(county, prev_pct, pmp_pct) %>%
+    print()
+
+  scatter_data %>%
+    filter(year == 2023) %>%
+    summarise(median_pmp_pct = median(pmp_pct)) %>%
+    print()
 
 # COMPUTE ESTIMATED NUMBER OF PWUO-HR NOT RECEIVING BUPRENORPHINE #
 
@@ -995,122 +998,4 @@ ggsave(filename = "N.png",
   write.csv(untreated_state_csv,
             file = "WAprevalence/output/tables/pwuohr_without_bup_statewide.csv",
             row.names = F)
-
-# COMPUTE SPATIAL CROSS CORRELATION USING LOCAL MORAN'S I #
-
-   # pair prevalence estimates w/ buprenorphine estimates
-   prev_pmp_data <- prev_outcome_data(pmp_results)
-
-   # compute adjacency matrix for NC counties
-   WA_map <- shape_county_WA[order(shape_county_WA$COUNTYFP),] #convert to data frame
-   
-   nbmat <- poly2nb(WA_map)
-   
-   n <- length(shape_county_WA$NAME) # should be 39
-   
-   A <- matrix(0,n,n)
-   
-   for(i in 1:n){
-     
-     A[i,unlist(nbmat[[i]])]=1
-     
-   }
-   
-  # compute Moran's I for a given year of the data
-  crossCorrelation_year <- function(year) {
-    
-    crossCorrelation_data <- prev_pmp_data[prev_pmp_data$year == year,]
-    prev_est <- crossCorrelation_data %>% pull(prev_est)
-    pmp_est <- crossCorrelation_data %>% pull(outcome_est)
-    
-    crossCorrelation(prev_est,
-                     pmp_est,
-                     w = A,
-                     dist.function = "none")
-    
-  }
-   
-   # save crossCorrelation values
-   crossCorrelation_2017 <- crossCorrelation_year(2017)
-   crossCorrelation_2018 <- crossCorrelation_year(2018)
-   crossCorrelation_2019 <- crossCorrelation_year(2019)
-   crossCorrelation_2020 <- crossCorrelation_year(2020)
-   crossCorrelation_2021 <- crossCorrelation_year(2021)
-   crossCorrelation_2022 <- crossCorrelation_year(2022)
-   crossCorrelation_2023 <- crossCorrelation_year(2023)
- 
-  # extract clusters and put into data frame
-   cluster_data <- function(data, year) {
-     
-     prev_pmp_data_year <- prev_pmp_data[prev_pmp_data$year==year,] %>%
-       mutate(cluster = data$clusters,
-              bi_class = case_when(
-                cluster == "Low.Low" ~ "1-1",
-                cluster == "Low.High" ~ "1-2",
-                cluster == "High.Low" ~ "2-1",
-                cluster == "High.High" ~ "2-2"
-               )
-              )
-     
-     shape_county_WA %>%
-       mutate(NAME = tolower(NAME)) %>%
-       rename(county = NAME) %>%
-       left_join(prev_pmp_data_year,
-                 by = c("county"))
-   
-   }
-   
-   # extract tidy cluster data for each year
-   cluster_data_2017 <- cluster_data(crossCorrelation_2017, 2017)
-   cluster_data_2018 <- cluster_data(crossCorrelation_2018, 2018)
-   cluster_data_2019 <- cluster_data(crossCorrelation_2019, 2019)
-   cluster_data_2020 <- cluster_data(crossCorrelation_2020, 2020)
-   cluster_data_2021 <- cluster_data(crossCorrelation_2021, 2021)
-   cluster_data_2022 <- cluster_data(crossCorrelation_2022, 2022)
-   cluster_data_2023 <- cluster_data(crossCorrelation_2023, 2023)
-   
-   # stack data
-   cluster_data <- cluster_data_2017 %>%
-                      bind_rows(cluster_data_2018,
-                                cluster_data_2019,
-                                cluster_data_2020,
-                                cluster_data_2021,
-                                cluster_data_2022,
-                                cluster_data_2023)
-   
-   # create biscale plot using cluster from crossCorrelation
-   cluster_legend <- bi_legend(pal = "GrPink",
-                               dim = 2,
-                               xlab = "Prevalence",
-                               ylab = "Buprenorphine",
-                               size = 5)
-   
-   cluster_map <- cluster_data %>%
-     ggplot() +
-     geom_sf(aes(fill = bi_class), 
-             color = "white",
-             size = 0.1, 
-             show.legend = F) +
-     bi_scale_fill(pal = "GrPink", dim = 2) +
-     facet_wrap(~year, nrow=2, ncol =4) +
-     theme_map() +
-     theme(strip.background = element_rect(fill = "white", color = NA),
-           strip.text = element_text(color = "black",
-                                     size = 12, 
-                                     hjust = 0),
-           legend.text = element_text(size = 12),
-           legend.title = element_text(size = 12)
-     )
-   
-   ggdraw() +
-     draw_plot(cluster_map, 0, 0, 1, 1) +
-     draw_plot(cluster_legend, 0.4, .8, 0.2, 0.2) 
-   
-   ggsave("crossCorr_biplot_2dim.png",
-          device="png",
-          path="WAprevalence/output/maps",
-          width = 12,
-          height = 10,
-          units = "cm",
-          bg = "white")
 
