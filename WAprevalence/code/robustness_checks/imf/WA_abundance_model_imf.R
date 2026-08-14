@@ -6,7 +6,7 @@
 # standalone copy of WA_abundance_model.R, kept separate so the sensitivity analysis is
 # fully contained. The ONLY substantive difference from the primary analysis is the NSDUH
 # input: the 2022-2023 and 2023-2024 survey estimates use OPIIMFNMYR (opioid misuse including
-# illicitly manufactured fentanyl) in place of OPINMYR2. OPIIMFNMYR is not available for the
+# illicitly manufactured fentanyl) in place of OPINMYR. OPIIMFNMYR is not available for the
 # earlier survey periods, so 2016-2017 through 2021-2022 are unchanged. The model itself,
 # the outcome data, and the population denominators are identical.
 # Keep in sync with WA_abundance_model.R if that file changes.

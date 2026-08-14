@@ -168,7 +168,7 @@ library(tidycensus) # pull pop data from US Census
 # load state-level survey data from NSDUH using the SAMHSA datatools web application.
 # source: https://datatools.samhsa.gov/
 
-  # pull raw data; estimates are of past year opioid misuse (OPINMYR2)
+  # pull raw data; estimates are of past year opioid misuse (OPINMYR)
   # no two-year datasets span 2020 (NSDUH trend break), hence the gap between 2018-2019 and 2021-2022
   nsduh_2016_2017_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2016_2017.csv")
   nsduh_2017_2018_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2017_2018.csv")
