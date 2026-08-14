@@ -1,6 +1,15 @@
 # PRE-PROCESS WASHINGTON STATE DATA FOR USE IN INTEGRATED ABUNDANCE MODEL #
+# IMF SENSITIVITY ANALYSIS #
 # BRIAN N. WHITE #
 # 2025-01-17 #
+#
+# standalone copy of WA_abundance_data.R, kept separate so the sensitivity analysis is
+# fully contained. The ONLY substantive difference from the primary analysis is the NSDUH
+# input: the 2022-2023 and 2023-2024 survey estimates use OPIIMFNMYR (opioid misuse including
+# illicitly manufactured fentanyl) in place of OPINMYR2. OPIIMFNMYR is not available for the
+# earlier survey periods, so 2016-2017 through 2021-2022 are unchanged. The model itself,
+# the outcome data, and the population denominators are identical.
+# Keep in sync with WA_abundance_data.R if that file changes.
 
 # IMPORT R PACKAGES
 library(tidyverse) # data manipulation and visualization
@@ -168,14 +177,16 @@ library(tidycensus) # pull pop data from US Census
 # load state-level survey data from NSDUH using the SAMHSA datatools web application.
 # source: https://datatools.samhsa.gov/
 
-  # pull raw data; estimates are of past year opioid misuse (OPINMYR2)
+  # pull raw data; 2016-2017 through 2021-2022 are past year opioid misuse (OPINMYR2),
+  # 2022-2023 and 2023-2024 are the IMF-inclusive variant (OPIIMFNMYR), which SAMHSA does not
+  # publish for the earlier survey periods
   # no two-year datasets span 2020 (NSDUH trend break), hence the gap between 2018-2019 and 2021-2022
   nsduh_2016_2017_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2016_2017.csv")
   nsduh_2017_2018_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2017_2018.csv")
   nsduh_2018_2019_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2018_2019.csv")
   nsduh_2021_2022_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2021_2022.csv")
-  nsduh_2022_2023_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2022_2023.csv")
-  nsduh_2023_2024_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2023_2024.csv")
+  nsduh_2022_2023_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2022_2023_OPIIMFNMYR.csv")
+  nsduh_2023_2024_raw <- read.csv("WAprevalence/data/nsduh/nsduh_2yr_2023_2024_OPIIMFNMYR.csv")
 
   # process raw data
   # the SAMHSA export is not consistent across survey periods: the misuse variable is column 1
@@ -253,4 +264,4 @@ library(tidycensus) # pull pop data from US Census
 save(adj, num,
      yfit,
      S, S.se, logit_S, logit_S.se, ell.rate,
-     file = "WAprevalence/data/data_for_analysis.Rda")
+     file = "WAprevalence/data/data_for_analysis_imf.Rda")

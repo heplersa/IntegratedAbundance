@@ -62,7 +62,7 @@ model_code <- nimbleCode({
     
   }
   
-  for(t in 2:(T-1)){ # years 2 through T-1
+  for(t in 2:T){ # years 2 through T
 
     for(i in 1:R){ # counties
 
@@ -105,49 +105,6 @@ model_code <- nimbleCode({
 
   }
 
-  for(t in T:T){ # last year: constrain mu[T] = mu[T-1]
-
-    for(i in 1:R){ # counties
-
-      for(j in 1:2){ # outcomes (each patient contributes only one count)
-
-        y[(t-1)*R+i,j] ~ dbinom(pi[(t-1)*R+i,j], N[(t-1)*R+i])
-        mu.f[(t-1)*R+i,j] <- phi.f[j]*f[(t-2)*R+i, j]
-
-      }
-
-      # outcomes (each patient can contribute more than one count)
-
-        # hospitalization outcome has data for all years so no need to shift time-index
-        y[(t-1)*R+i,4] ~ dpois(pi[(t-1)*R+i,4]*N[(t-1)*R+i])
-        mu.f[(t-1)*R+i,4] <- phi.f[4]*f[(t-2)*R+i, 4]
-
-        # poisson outcomes are censored in [1,9]
-        censored_hosp[(t-1)*R+i] ~ dinterval(y[(t-1)*R+i,4], c_hosp[(t-1)*R+i, 1:2])
-
-      # outcome error term
-      eps[(t-1)*R+i, 1:K] ~ dmnorm(mean = mean.eps[1:K], prec = prec.eps[1:K, 1:K])
-
-      # logistic link for binomial outcome(s)
-      pi[(t-1)*R+i,1] <- ilogit(beta[t,1] + (f[(t-1)*R+i,1] + mu.f[(t-1)*R+i,1]) + eps[(t-1)*R+i,1])
-      pi[(t-1)*R+i,2] <- ilogit(beta[t,2] + (f[(t-1)*R+i,2] + mu.f[(t-1)*R+i,2]) + eps[(t-1)*R+i,2])
-
-      # log link for poisson outcome(s)
-      pi[(t-1)*R+i,4] <- exp(beta[t,4] + (f[(t-1)*R+i,4] + mu.f[(t-1)*R+i,4]) + eps[(t-1)*R+i,4])
-
-      # latent counts (process model)
-      mu.u[(t-1)*R+i] <- phi.u*u[(t-2)*R+i]
-      lambda[(t-1)*R+i] <- exp((u[(t-1)*R+i] + mu.u[(t-1)*R+i]) + v[(t-1)*R+i])
-      N[(t-1)*R+i] ~ dpois(mu[t]*lambda[(t-1)*R+i]*P[(t-1)*R+i])
-      v[(t-1)*R+i] ~ dnorm(0, tau.v)
-
-    }
-
-    # mean state-wide risk of misuse held constant in last year
-    mu[t] <- mu[t-1]
-
-  }
-  
   for(t in 2:(T-2)){ # remaining years (for outcomes with data missing for 2018-2019)
     
     for(i in 1:R){ # counties
@@ -168,16 +125,14 @@ model_code <- nimbleCode({
     
   }
   
-  # state-wide survey data model
-  for(l in 1:(L-1)){
+  # state-wide survey data model; logit(mu) is linear in t, so the average of the true
+  # logit-prevalence over a survey period is the linear predictor at that period's midpoint
+  for(l in 1:L){
 
     S[l] ~ dnorm(beta.mu[1]+beta.mu[2]*ell.rate[l], sd=S.se[l])
 
   }
 
-  # last survey spans T-1 to T; mu constant so effective midpoint is T-1
-  S[L] ~ dnorm(beta.mu[1]+beta.mu[2]*(T-1), sd=S.se[L])
-  
   # spatial random effects for data level
   
     # outcomes with data over whole study period
@@ -495,5 +450,5 @@ samples <- runMCMC(compiled_mcmc,
                    setSeed = 2)
 
 Sys.time()-st
-save(samples, file = "WAprevalence/output/mcmc/MCMC_N_pois_2_mill_2026_06_28.Rda")
+save(samples, file = "WAprevalence/output/mcmc/MCMC_N_pois_2_mill_2026_08_14.Rda")
 }
