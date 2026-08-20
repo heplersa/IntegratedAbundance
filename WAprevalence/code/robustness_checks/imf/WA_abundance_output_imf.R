@@ -40,18 +40,18 @@ load("WAprevalence/output/mcmc/MCMC_N_pois_3_chains_2_mill_each_imf_2026_08_14.R
 load("WAprevalence/data/shape_county_WA.Rda")
 
 # EXAMINE MCMC CONVERGENCE
-MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:234, 20), ", 1]"), ISB = F, filename = "pmp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:234, 20), ", 2]"), ISB = F, filename = "death", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(79:234, 20), ", 3]"), ISB = F, filename = "ed", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:234, 20), ", 4]"), ISB = F, filename = "hosp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("N[", sample(1:234, 20), "]"), ISB = F, filename = "N", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("lambda[", sample(1:234, 20), "]"), ISB = F, filename = "lambda", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:234, 20), ", 1]"), ISB = F, filename = "f_pmp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:234, 20), ", 2]"), ISB = F, filename = "f_death", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(79:234, 20), ", 3]"), ISB = F, filename = "f_ed", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:234, 20), ", 4]"), ISB = F, filename = "f_hosp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("v[", sample(1:234, 20), "]"), ISB = F, filename = "v", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("u[", sample(1:234, 20), "]"), ISB = F, filename = "u", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:273, 20), ", 1]"), ISB = F, filename = "pmp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:273, 20), ", 2]"), ISB = F, filename = "death", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(79:273, 20), ", 3]"), ISB = F, filename = "ed", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:273, 20), ", 4]"), ISB = F, filename = "hosp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("N[", sample(1:273, 20), "]"), ISB = F, filename = "N", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("lambda[", sample(1:273, 20), "]"), ISB = F, filename = "lambda", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:273, 20), ", 1]"), ISB = F, filename = "f_pmp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:273, 20), ", 2]"), ISB = F, filename = "f_death", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(79:273, 20), ", 3]"), ISB = F, filename = "f_ed", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:273, 20), ", 4]"), ISB = F, filename = "f_hosp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("v[", sample(1:273, 20), "]"), ISB = F, filename = "v", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("u[", sample(1:273, 20), "]"), ISB = F, filename = "u", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("beta[", 1:7, ", 1]"), ISB = F, filename = "beta_pmp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("beta[", 1:7, ", 2]"), ISB = F, filename = "beta_death", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
 MCMCvis::MCMCtrace(samples, params = paste0("beta[", 3:7, ", 3]"), ISB = F, filename = "beta_ed", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
@@ -60,10 +60,10 @@ MCMCvis::MCMCtrace(samples, params = "beta.mu", filename = "beta.mu", wd = "WApr
 MCMCvis::MCMCtrace(samples, params = "mu", filename = "mu", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
 MCMCvis::MCMCtrace(samples, params = "tau.f", filename = "tau.f", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
 MCMCvis::MCMCtrace(samples, params = "tau.u", filename = "tau.u", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 1]"), ISB = F, filename = "eps_pmp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 2]"), ISB = F, filename = "eps_death", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 3]"), ISB = F, filename = "eps_ed", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:234, 20), ", 4]"), ISB = F, filename = "eps_hosp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:273, 20), ", 1]"), ISB = F, filename = "eps_pmp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:273, 20), ", 2]"), ISB = F, filename = "eps_death", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:273, 20), ", 3]"), ISB = F, filename = "eps_ed", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:273, 20), ", 4]"), ISB = F, filename = "eps_hosp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
 MCMCvis::MCMCtrace(samples, params = "prec.eps", filename = "prec.eps", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
 
 # COMBINE CHAINS FOR POSTERIOR INFERENCE
@@ -74,6 +74,9 @@ results <- list(colMeans(samples, na.rm = T),
                   apply(samples, 2,
                         quantile, probs=c(.025,.975), na.rm = T),
                   apply(samples, 2, sd, na.rm = T))
+
+# save posterior summaries for downstream use without the full MCMC samples
+save(results, file = "WAprevalence/output/robustness_checks/imf/results_imf.Rda")
 
 # specify indices of parameters of interest
 pmp_lwr <- which(names(results[[1]])=="pi[1, 1]")
