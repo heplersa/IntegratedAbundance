@@ -695,7 +695,7 @@ ggsave(filename = "N.png",
 
 # CREATE RATE DENOMINATOR COMPARISON FIGURE FOR MANUSCRIPT #
 
-  # each outcome rate expressed per 100,000 population and per 100 PWUO-HR
+  # each outcome rate expressed per 100,000 population and per 100,000 PWUO-HR
   denominator_data <- bind_rows(pmp_results %>% mutate(outcome = "Buprenorphine"),
                                 death_results %>% mutate(outcome = "Overdose death"),
                                 ed_results %>% mutate(outcome = "ED visits"),
@@ -707,14 +707,14 @@ ggsave(filename = "N.png",
                                   year,
                                   outcome,
                                   `per 100,000 population 12+` = 10^5*mean*N_est/pop,
-                                  `per 100 PWUO-HR` = 100*mean) %>%
+                                  `per 100,000 PWUO-HR` = 10^5*mean) %>%
                         pivot_longer(starts_with("per"),
                                      names_to = "denominator",
                                      values_to = "rate")
 
   # panel order: one outcome per row, population denominator on the left
   panel_order <- expand_grid(outcome = c("Buprenorphine", "Overdose death", "ED visits", "Hospitalizations"),
-                             denominator = c("per 100,000 population 12+", "per 100 PWUO-HR")) %>%
+                             denominator = c("per 100,000 population 12+", "per 100,000 PWUO-HR")) %>%
                    mutate(panel = paste0(LETTERS[1:8], ") ", outcome, " ", denominator))
 
   denominator_plot <- denominator_data %>%
