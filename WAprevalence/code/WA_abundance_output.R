@@ -572,19 +572,21 @@ ggsave(filename = "N.png",
   lwr95_aggr <- CrI_aggr %>% slice(1) %>% unlist()
   upr95_aggr <- CrI_aggr %>% slice(2) %>% unlist()
   
-  # plot model estimate against NSDUH
+  # plot model estimate against NSDUH; each two-year estimate and its model counterpart are
+  # plotted at the survey-period midpoint (e.g., 2016-2017 at 2016.5), where the linear trend
+  # evaluates the survey mean
   mu_trend_plot <- tibble(pred_mu_aggr = pred_mu_aggr,
          lwr95_aggr = lwr95_aggr,
          upr95_aggr = upr95_aggr,
-         year = 2016:2023
+         year = 2016:2023 + 0.5
   ) %>%
     ggplot() +
     geom_point(aes(x = year, y = S, color = "NSDUH Data"),
-               data = tibble(year = c(2016:2018, 2021:2023),
+               data = tibble(year = c(2016:2018, 2021:2023) + 0.5,
                              S = S)) +
     geom_errorbar(aes(x = year, y = S, ymin = S - 1.96*S.se, ymax = S + 1.96*S.se),
                   width = 0.05,
-                  data = tibble(year = c(2016:2018, 2021:2023),
+                  data = tibble(year = c(2016:2018, 2021:2023) + 0.5,
                                 S = S,
                                 S.se = S.se)) +
     geom_line(aes(x = year, y = pred_mu_aggr, color = "Model")) +
