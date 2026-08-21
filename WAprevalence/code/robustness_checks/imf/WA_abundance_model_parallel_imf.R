@@ -1,4 +1,4 @@
-# PARALLEL 3-CHAIN RUN of WA_abundance_model.R
+# PARALLEL 3-CHAIN RUN of WA_abundance_model_imf.R
 # each worker builds its own compiled model and runs one chain. launch from the repo root.
 # needs >= 3 cores and ~3x the RAM of a single run.
 
@@ -10,7 +10,7 @@ wd <- getwd()
 run_chain <- function(chain, wd){
   setwd(wd)
   BUILD_ONLY <- TRUE                                             # source build-only (skip the script's own run)
-  source("WAprevalence/code/WA_abundance_model.R", local = TRUE) # -> compiled_mcmc, inits_list, MCS
+  source("WAprevalence/code/robustness_checks/imf/WA_abundance_model_imf.R", local = TRUE) # -> compiled_mcmc, inits_list, MCS
   runMCMC(compiled_mcmc,
           inits   = inits_list[[chain]],
           niter   = MCS,
@@ -28,4 +28,4 @@ stopCluster(cl)
 samples <- do.call(mcmc.list, chains)
 
 dir.create("WAprevalence/output/mcmc", recursive = TRUE, showWarnings = FALSE)
-save(samples, file = "WAprevalence/output/mcmc/MCMC_N_pois_3_chains_2_mill_each_2026_08_14.Rda")
+save(samples, file = "WAprevalence/output/mcmc/MCMC_N_pois_3_chains_2_mill_each_imf_2026_08_14.Rda")

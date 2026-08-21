@@ -12,7 +12,7 @@ Run in order:
 
 ## Data
 
-- `nsduh/` NSDUH two-year state-level estimates of past-year opioid misuse (five survey periods, 2016-2023)
+- `nsduh/` NSDUH two-year state-level estimates of past-year opioid misuse (six survey periods, 2016-2024); files with an `_OPIIMFNMYR` suffix are the IMF-inclusive variant used only by the sensitivity analysis
 - `population/` WA OFM small area population estimates
 - `shape_county_WA.Rda` county shapefile
 - County-level outcome counts (buprenorphine receipt, overdose deaths, ED visits, hospitalizations) are from the WA DOH overdose dashboard (https://doh.wa.gov/data-and-statistical-reports/washington-tracking-network-wtn/opioids/overdose-dashboard) and are not stored in this repository.

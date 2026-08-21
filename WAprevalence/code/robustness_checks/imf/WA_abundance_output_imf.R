@@ -1,6 +1,15 @@
 # EXAMINE WA ABUNDANCE MODEL MCMC CONVERGENCE & GENERATE FIGURES/TABLES #
+# IMF SENSITIVITY ANALYSIS #
 # BRIAN N. WHITE #
 # 2025-01-19 #
+#
+# standalone copy of WA_abundance_output.R, kept separate so the sensitivity analysis is
+# fully contained. The ONLY substantive difference from the primary analysis is the NSDUH
+# input: the 2022-2023 and 2023-2024 survey estimates use OPIIMFNMYR (opioid misuse including
+# illicitly manufactured fentanyl) in place of OPINMYR. OPIIMFNMYR is not available for the
+# earlier survey periods, so 2016-2017 through 2021-2022 are unchanged. The model itself,
+# the outcome data, and the population denominators are identical.
+# Keep in sync with WA_abundance_output.R if that file changes.
 
 # LOAD R PACKAGES
 library(tidyverse) # data manipulation and visualization
@@ -15,41 +24,47 @@ library(flextable) # make pretty tables
 library(biscale) # create biscale plots
 library(cowplot) # draw_plot
 
+# CREATE OUTPUT DIRECTORIES FOR THIS SENSITIVITY ANALYSIS
+for(d in c("diagnostics", "tables", "maps")){
+  dir.create(file.path("WAprevalence/output/robustness_checks/imf", d),
+             recursive = TRUE, showWarnings = FALSE)
+}
+
 # IMPORT PRE-PROCESSED DATA USED TO FIT MODEL. 
-load("WAprevalence/data/data_for_analysis.Rda")
+load("WAprevalence/data/data_for_analysis_imf.Rda")
 
 # IMPORT MCMC OUTPUT FROM MODEL
-load("WAprevalence/output/mcmc/MCMC_N_pois_3_chains_2_mill_each_2026_08_14.Rda")
+load("WAprevalence/output/mcmc/MCMC_N_pois_3_chains_2_mill_each_imf_2026_08_14.Rda")
 
 # IMPORT SHAPE FILES FOR WA COUNTIES
 load("WAprevalence/data/shape_county_WA.Rda")
 
 # EXAMINE MCMC CONVERGENCE
-MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:273, 20), ", 1]"), ISB = F, filename = "pmp", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:273, 20), ", 2]"), ISB = F, filename = "death", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(79:273, 20), ", 3]"), ISB = F, filename = "ed", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:273, 20), ", 4]"), ISB = F, filename = "hosp", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("N[", sample(1:273, 20), "]"), ISB = F, filename = "N", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("lambda[", sample(1:273, 20), "]"), ISB = F, filename = "lambda", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:273, 20), ", 1]"), ISB = F, filename = "f_pmp", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:273, 20), ", 2]"), ISB = F, filename = "f_death", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(79:273, 20), ", 3]"), ISB = F, filename = "f_ed", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:273, 20), ", 4]"), ISB = F, filename = "f_hosp", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("v[", sample(1:273, 20), "]"), ISB = F, filename = "v", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("u[", sample(1:273, 20), "]"), ISB = F, filename = "u", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("beta[", 1:7, ", 1]"), ISB = F, filename = "beta_pmp", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("beta[", 1:7, ", 2]"), ISB = F, filename = "beta_death", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("beta[", 3:7, ", 3]"), ISB = F, filename = "beta_ed", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("beta[", 1:7, ", 4]"), ISB = F, filename = "beta_hosp", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = "beta.mu", filename = "beta.mu", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = "mu", filename = "mu", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = "tau.f", filename = "tau.f", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = "tau.u", filename = "tau.u", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:273, 20), ", 1]"), ISB = F, filename = "eps_pmp", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:273, 20), ", 2]"), ISB = F, filename = "eps_death", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:273, 20), ", 3]"), ISB = F, filename = "eps_ed", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:273, 20), ", 4]"), ISB = F, filename = "eps_hosp", wd = "WAprevalence/output/diagnostics")
-MCMCvis::MCMCtrace(samples, params = "prec.eps", filename = "prec.eps", wd = "WAprevalence/output/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:273, 20), ", 1]"), ISB = F, filename = "pmp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:273, 20), ", 2]"), ISB = F, filename = "death", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(79:273, 20), ", 3]"), ISB = F, filename = "ed", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("pi[", sample(1:273, 20), ", 4]"), ISB = F, filename = "hosp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("N[", sample(1:273, 20), "]"), ISB = F, filename = "N", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("lambda[", sample(1:273, 20), "]"), ISB = F, filename = "lambda", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:273, 20), ", 1]"), ISB = F, filename = "f_pmp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:273, 20), ", 2]"), ISB = F, filename = "f_death", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(79:273, 20), ", 3]"), ISB = F, filename = "f_ed", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("f[", sample(1:273, 20), ", 4]"), ISB = F, filename = "f_hosp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("v[", sample(1:273, 20), "]"), ISB = F, filename = "v", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("u[", sample(1:273, 20), "]"), ISB = F, filename = "u", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("beta[", 1:7, ", 1]"), ISB = F, filename = "beta_pmp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("beta[", 1:7, ", 2]"), ISB = F, filename = "beta_death", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("beta[", 3:7, ", 3]"), ISB = F, filename = "beta_ed", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("beta[", 1:7, ", 4]"), ISB = F, filename = "beta_hosp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = "beta.mu", filename = "beta.mu", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = "mu", filename = "mu", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = "tau.f", filename = "tau.f", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = "tau.u", filename = "tau.u", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:273, 20), ", 1]"), ISB = F, filename = "eps_pmp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:273, 20), ", 2]"), ISB = F, filename = "eps_death", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:273, 20), ", 3]"), ISB = F, filename = "eps_ed", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = paste0("eps[", sample(1:273, 20), ", 4]"), ISB = F, filename = "eps_hosp", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
+MCMCvis::MCMCtrace(samples, params = "prec.eps", filename = "prec.eps", wd = "WAprevalence/output/robustness_checks/imf/diagnostics")
 
 # COMBINE CHAINS FOR POSTERIOR INFERENCE
 samples <- rbind(samples[[1]], samples[[2]], samples[[3]])
@@ -61,7 +76,7 @@ results <- list(colMeans(samples, na.rm = T),
                   apply(samples, 2, sd, na.rm = T))
 
 # save posterior summaries for downstream use without the full MCMC samples
-save(results, file = "WAprevalence/output/results.Rda")
+save(results, file = "WAprevalence/output/robustness_checks/imf/results_imf.Rda")
 
 # specify indices of parameters of interest
 pmp_lwr <- which(names(results[[1]])=="pi[1, 1]")
@@ -166,27 +181,27 @@ N_prev_results_csv <- N_results %>%
                                upr95_prev)
 
 write.csv(pmp_results_csv,
-          file = "WAprevalence/output/tables/pmp_results.csv",
+          file = "WAprevalence/output/robustness_checks/imf/tables/pmp_results.csv",
           row.names = F)
 
 write.csv(death_results_csv,
-          file = "WAprevalence/output/tables/death_results.csv",
+          file = "WAprevalence/output/robustness_checks/imf/tables/death_results.csv",
           row.names = F)
 
 write.csv(ed_results_csv,
-          file = "WAprevalence/output/tables/ed_results.csv",
+          file = "WAprevalence/output/robustness_checks/imf/tables/ed_results.csv",
           row.names = F)
 
 write.csv(hosp_results_csv,
-          file = "WAprevalence/output/tables/hosp_results.csv",
+          file = "WAprevalence/output/robustness_checks/imf/tables/hosp_results.csv",
           row.names = F)
 
 write.csv(N_results_csv,
-          file = "WAprevalence/output/tables/N_results.csv",
+          file = "WAprevalence/output/robustness_checks/imf/tables/N_results.csv",
           row.names = F)
 
 write.csv(N_prev_results_csv,
-          file = "WAprevalence/output/tables/N_prev_results.csv",
+          file = "WAprevalence/output/robustness_checks/imf/tables/N_prev_results.csv",
           row.names = F)
 
 # CREATE STATE-WIDE PREVALENCE TABLE FOR MANUSCRIPT
@@ -205,11 +220,11 @@ write.csv(N_prev_results_csv,
                                             `Population 12+` = format(pop, big.mark = ","))
 
   write.csv(statewide_prevalence_table,
-            file = "WAprevalence/output/tables/statewide_prevalence_table.csv",
+            file = "WAprevalence/output/robustness_checks/imf/tables/statewide_prevalence_table.csv",
             row.names = F)
 
   save_as_docx(autofit(flextable(statewide_prevalence_table)),
-               path = "WAprevalence/output/tables/statewide_prevalence_table.docx")
+               path = "WAprevalence/output/robustness_checks/imf/tables/statewide_prevalence_table.docx")
 
 # EXAMINE MODIFIED GELMAN-RUBIN (GR) STATISTICS FOR SELECT PARAMETERS
 
@@ -316,7 +331,7 @@ create_choropleth_map <- function(data, value, colorbar_type = NULL, colorbar_ti
   
 ggsave(filename = "pmp_obs_rate.png", 
        plot = pmp_obs_rate_map, 
-       path = "WAprevalence/output/maps", 
+       path = "WAprevalence/output/robustness_checks/imf/maps", 
        bg = "White",
        dpi = "retina",
        height = 3,
@@ -324,7 +339,7 @@ ggsave(filename = "pmp_obs_rate.png",
 
 ggsave(filename = "death_obs_rate.png", 
        plot = death_obs_rate_map, 
-       path = "WAprevalence/output/maps", 
+       path = "WAprevalence/output/robustness_checks/imf/maps", 
        bg = "White",
        dpi = "retina",
        height = 3,
@@ -332,7 +347,7 @@ ggsave(filename = "death_obs_rate.png",
 
 ggsave(filename = "ed_obs_rate.png", 
        plot = ed_obs_rate_map, 
-       path = "WAprevalence/output/maps", 
+       path = "WAprevalence/output/robustness_checks/imf/maps", 
        bg = "White",
        dpi = "retina",
        height = 3,
@@ -340,7 +355,7 @@ ggsave(filename = "ed_obs_rate.png",
 
 ggsave(filename = "hosp_obs_rate.png", 
        plot = hosp_obs_rate_map, 
-       path = "WAprevalence/output/maps", 
+       path = "WAprevalence/output/robustness_checks/imf/maps", 
        bg = "White",
        dpi = "retina",
        height = 3,
@@ -348,7 +363,7 @@ ggsave(filename = "hosp_obs_rate.png",
 
 ggsave(filename = "pmp.png", 
        plot = pmp_map, 
-       path = "WAprevalence/output/maps", 
+       path = "WAprevalence/output/robustness_checks/imf/maps", 
        bg = "White",
        dpi = "retina",
        height = 3,
@@ -356,7 +371,7 @@ ggsave(filename = "pmp.png",
 
 ggsave(filename = "death.png", 
        plot = death_map, 
-       path = "WAprevalence/output/maps", 
+       path = "WAprevalence/output/robustness_checks/imf/maps", 
        bg = "White",
        dpi = "retina",
        height = 3,
@@ -364,7 +379,7 @@ ggsave(filename = "death.png",
 
 ggsave(filename = "ed.png", 
        plot = ed_map, 
-       path = "WAprevalence/output/maps", 
+       path = "WAprevalence/output/robustness_checks/imf/maps", 
        bg = "White",
        dpi = "retina",
        height = 3,
@@ -372,7 +387,7 @@ ggsave(filename = "ed.png",
 
 ggsave(filename = "hosp.png", 
        plot = hosp_map, 
-       path = "WAprevalence/output/maps", 
+       path = "WAprevalence/output/robustness_checks/imf/maps", 
        bg = "White",
        dpi = "retina",
        height = 3,
@@ -380,7 +395,7 @@ ggsave(filename = "hosp.png",
 
 ggsave(filename = "lambda.png", 
        plot = lambda_map, 
-       path = "WAprevalence/output/maps", 
+       path = "WAprevalence/output/robustness_checks/imf/maps", 
        bg = "White",
        dpi = "retina",
        height = 3,
@@ -388,7 +403,7 @@ ggsave(filename = "lambda.png",
 
 ggsave(filename = "lambda_CrI.png", 
        plot = lambda_CrI_map, 
-       path = "WAprevalence/output/maps", 
+       path = "WAprevalence/output/robustness_checks/imf/maps", 
        bg = "White",
        dpi = "retina",
        height = 3,
@@ -396,7 +411,7 @@ ggsave(filename = "lambda_CrI.png",
 
 ggsave(filename = "N.png",
        plot = N_map,
-       path = "WAprevalence/output/maps",
+       path = "WAprevalence/output/robustness_checks/imf/maps",
        bg = "White",
        dpi = "retina",
        height = 3,
@@ -422,11 +437,11 @@ ggsave(filename = "N.png",
               PWMO_rate = sum(death)/sum(N_est))
 
   write.csv(death_rate_data,
-            file = "WAprevalence/output/tables/death_rate_data.csv",
+            file = "WAprevalence/output/robustness_checks/imf/tables/death_rate_data.csv",
             row.names = F)
 
   write.csv(state_wide_death_rate,
-            file = "WAprevalence/output/tables/state_wide_death_rate.csv",
+            file = "WAprevalence/output/robustness_checks/imf/tables/state_wide_death_rate.csv",
             row.names = F)
 
 # EXAMINE ESTIMATED TIME-VARYING INTERCEPTS FOR EACH OUTCOME
@@ -510,7 +525,7 @@ ggsave(filename = "N.png",
   
   ggsave(filename = "beta_log.png",
          plot = outcome_trend_plot,
-         path = "WAprevalence/output",
+         path = "WAprevalence/output/robustness_checks/imf",
          dpi = "retina",
          width = 13,
          height = 10,
@@ -604,7 +619,7 @@ ggsave(filename = "N.png",
   ggsave("2_yr_mu_trend.png",
          mu_trend_plot,
          device="png",
-         path="WAprevalence/output",
+         path="WAprevalence/output/robustness_checks/imf",
          width = 12,
          height = 10,
          units = "cm")
@@ -622,7 +637,7 @@ ggsave(filename = "N.png",
 
   ggsave("state_level_pair.png",
          state_pair_plot,
-         path = "WAprevalence/output",
+         path = "WAprevalence/output/robustness_checks/imf",
          dpi = "retina",
          width = 26,
          height = 10,
@@ -673,7 +688,7 @@ ggsave(filename = "N.png",
   ggsave("trend_spaghetti.png",
          county_trend_plot,
          device = "png",
-         path = "WAprevalence/output/maps",
+         path = "WAprevalence/output/robustness_checks/imf/maps",
          width = 11,
          height = 6.8,
          bg = "white")
@@ -719,7 +734,7 @@ ggsave(filename = "N.png",
   ggsave("rate_denominator_boxplots.png",
          denominator_plot,
          device = "png",
-         path = "WAprevalence/output/maps",
+         path = "WAprevalence/output/robustness_checks/imf/maps",
          width = 8,
          height = 9.5,
          bg = "white")
@@ -815,7 +830,7 @@ ggsave(filename = "N.png",
 
      ggsave(filename,
             device="png",
-            path="WAprevalence/output/maps",
+            path="WAprevalence/output/robustness_checks/imf/maps",
             width = 12,
             height = 5,
             units = "cm",
@@ -855,7 +870,7 @@ ggsave(filename = "N.png",
   gap_probs <- map_dfr(1:7, gap_prob_year)
 
   write.csv(gap_probs,
-            file = "WAprevalence/output/tables/gap_probability_by_threshold.csv",
+            file = "WAprevalence/output/robustness_checks/imf/tables/gap_probability_by_threshold.csv",
             row.names = F)
 
   # print 2023 at the quartile-equivalent threshold for the manuscript
@@ -916,7 +931,7 @@ ggsave(filename = "N.png",
   ggsave("gap_prob_curves_2023.png",
          gap_curve_plot,
          device = "png",
-         path = "WAprevalence/output/maps",
+         path = "WAprevalence/output/robustness_checks/imf/maps",
          width = 7.5,
          height = 5.5,
          bg = "white")
@@ -959,7 +974,7 @@ ggsave(filename = "N.png",
   ggsave("prev_coverage_scatter.png",
          prev_coverage_plot,
          device = "png",
-         path = "WAprevalence/output/maps",
+         path = "WAprevalence/output/robustness_checks/imf/maps",
          width = 9,
          height = 5.2,
          bg = "white")
@@ -997,7 +1012,7 @@ ggsave(filename = "N.png",
                           prop_upr95 = apply(untreated_prop_draws, 2, quantile, probs = .975))
 
   write.csv(untreated_csv,
-            file = "WAprevalence/output/tables/pwuohr_without_bup.csv",
+            file = "WAprevalence/output/robustness_checks/imf/tables/pwuohr_without_bup.csv",
             row.names = F)
 
   # statewide totals and proportions summed within each draw so the CrIs reflect joint uncertainty
@@ -1017,6 +1032,6 @@ ggsave(filename = "N.png",
   })
 
   write.csv(untreated_state_csv,
-            file = "WAprevalence/output/tables/pwuohr_without_bup_statewide.csv",
+            file = "WAprevalence/output/robustness_checks/imf/tables/pwuohr_without_bup_statewide.csv",
             row.names = F)
 

@@ -1,0 +1,7 @@
+﻿"RC-OPIOIDS (RX OPIOIDS OR HEROIN) - PAST YEAR MISUSE","STATE FIPS CODE (NUMERIC)","Total %","Total % SE","Total % CI (lower)","Total % CI (upper)","Row %","Row % SE","Row % CI (lower)","Row % CI (upper)","Column %","Column % SE","Column % CI (lower)","Column % CI (upper)","Weighted Count","Count","Count SE"
+"Overall","Overall","1","0","N/A","N/A","1","0","N/A","N/A","1","0","N/A","N/A","6713000","N/A","450000"
+"0 - Did not misuse in the past year","Overall","0.978","0.0051","0.965","0.986","1","0","N/A","N/A","0.978","0.0051","0.965","0.986","6562000","N/A","433000"
+"1 - Misused in the past year","Overall","0.022","0.0051","0.014","0.035","1","0","N/A","N/A","0.022","0.0051","0.014","0.035","151000","N/A","38000"
+"Overall","53 - Washington","1","0","N/A","N/A","1","0","N/A","N/A","1","0","N/A","N/A","6713000","N/A","450000"
+"0 - Did not misuse in the past year","53 - Washington","0.978","0.0051","0.965","0.986","1","0","N/A","N/A","0.978","0.0051","0.965","0.986","6562000","N/A","433000"
+"1 - Misused in the past year","53 - Washington","0.022","0.0051","0.014","0.035","1","0","N/A","N/A","0.022","0.0051","0.014","0.035","151000","N/A","38000"
