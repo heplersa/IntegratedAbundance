@@ -647,7 +647,7 @@ ggsave(filename = "N.png",
 # CREATE COUNTY TREND FIGURE FOR MANUSCRIPT #
 
   # stack prevalence and the four outcome rates; ED visits are only estimated from 2019
-  trend_data <- bind_rows(N_results %>% transmute(county, year, est = mean_prev, panel = "A) Prevalence of higher-risk opioid use"),
+  trend_data <- bind_rows(N_results %>% transmute(county, year, est = mean_prev, panel = "A) Prevalence of PWUO-HR"),
                           pmp_results %>% transmute(county, year, est = mean, panel = "B) Buprenorphine rate among PWUO-HR"),
                           death_results %>% transmute(county, year, est = mean, panel = "C) Overdose death rate among PWUO-HR"),
                           ed_results %>% transmute(county, year, est = mean, panel = "D) ED visit rate among PWUO-HR"),
@@ -962,7 +962,7 @@ ggsave(filename = "N.png",
                                     aes(x = 5.2, y = lab_y, label = str_to_title(county)),
                                     hjust = 0, size = 2.3) +
                           facet_wrap(~year, ncol = 4) +
-                          labs(x = "Estimated prevalence of higher-risk opioid use (%)",
+                          labs(x = "Estimated prevalence of PWUO-HR (%)",
                                y = "Estimated buprenorphine receipt rate among PWUO-HR (%)") +
                           theme_bw(base_size = 12) +
                           theme(panel.grid = element_blank(),
