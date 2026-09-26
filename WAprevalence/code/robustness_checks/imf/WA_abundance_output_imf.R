@@ -206,7 +206,7 @@ write.csv(N_prev_results_csv,
 
 # CREATE STATE-WIDE PREVALENCE TABLE FOR MANUSCRIPT
 
-  # prevalence column is the posterior for mu; PWUO-HR column sums the county-level estimates
+  # prevalence column is the posterior for mu; PWUO column sums the county-level estimates
   statewide_prevalence_table <- N_results %>%
                                   group_by(year) %>%
                                   summarise(N_est = sum(mean),
@@ -216,7 +216,7 @@ write.csv(N_prev_results_csv,
                                          upr95 = 100*results[[2]][2, mu_lwr:mu_upr]) %>%
                                   transmute(Year = year,
                                             `Prevalence % (95% CrI)` = sprintf("%.2f (%.2f, %.2f)", prev, lwr95, upr95),
-                                            `Estimated PWUO-HR` = format(round(N_est), big.mark = ","),
+                                            `Estimated PWUO` = format(round(N_est), big.mark = ","),
                                             `Population 12+` = format(pop, big.mark = ","))
 
   write.csv(statewide_prevalence_table,
@@ -521,7 +521,7 @@ ggsave(filename = "N.png",
            fill = "Outcome",
            shape = "Outcome",
            x = "Year",
-           y = "Statewide rate among PWUO-HR")
+           y = "Statewide rate among PWUO")
   
   ggsave(filename = "beta_log.png",
          plot = outcome_trend_plot,
@@ -610,7 +610,7 @@ ggsave(filename = "N.png",
                 fill = "light blue",
                 alpha = 0.5) +
     labs(x = "Year",
-         y = "Statewide prevalence of PWUO-HR") +
+         y = "Statewide prevalence of PWUO") +
     scale_color_manual(name = "", values = c("NSDUH Data" = "black", "Model" = "blue")) +
     theme_bw(base_size = 11) +
     theme(panel.grid = element_blank(),
@@ -647,11 +647,11 @@ ggsave(filename = "N.png",
 # CREATE COUNTY TREND FIGURE FOR MANUSCRIPT #
 
   # stack prevalence and the four outcome rates; ED visits are only estimated from 2019
-  trend_data <- bind_rows(N_results %>% transmute(county, year, est = mean_prev, panel = "A) Prevalence of PWUO-HR"),
-                          pmp_results %>% transmute(county, year, est = mean, panel = "B) Buprenorphine rate among PWUO-HR"),
-                          death_results %>% transmute(county, year, est = mean, panel = "C) Overdose death rate among PWUO-HR"),
-                          ed_results %>% transmute(county, year, est = mean, panel = "D) ED visit rate among PWUO-HR"),
-                          hosp_results %>% transmute(county, year, est = mean, panel = "E) Hospitalization rate among PWUO-HR"))
+  trend_data <- bind_rows(N_results %>% transmute(county, year, est = mean_prev, panel = "A) Prevalence of PWUO"),
+                          pmp_results %>% transmute(county, year, est = mean, panel = "B) Buprenorphine rate among PWUO"),
+                          death_results %>% transmute(county, year, est = mean, panel = "C) Overdose death rate among PWUO"),
+                          ed_results %>% transmute(county, year, est = mean, panel = "D) ED visit rate among PWUO"),
+                          hosp_results %>% transmute(county, year, est = mean, panel = "E) Hospitalization rate among PWUO"))
 
   # label the highest and lowest county in each panel's final year
   trend_labels <- trend_data %>%
@@ -695,7 +695,7 @@ ggsave(filename = "N.png",
 
 # CREATE RATE DENOMINATOR COMPARISON FIGURE FOR MANUSCRIPT #
 
-  # each outcome rate expressed per 100,000 population and per 100,000 PWUO-HR
+  # each outcome rate expressed per 100,000 population and per 100,000 PWUO
   denominator_data <- bind_rows(pmp_results %>% mutate(outcome = "Buprenorphine"),
                                 death_results %>% mutate(outcome = "Overdose death"),
                                 ed_results %>% mutate(outcome = "ED visits"),
@@ -707,14 +707,14 @@ ggsave(filename = "N.png",
                                   year,
                                   outcome,
                                   `per 100,000 population 12+` = 10^5*mean*N_est/pop,
-                                  `per 100,000 PWUO-HR` = 10^5*mean) %>%
+                                  `per 100,000 PWUO` = 10^5*mean) %>%
                         pivot_longer(starts_with("per"),
                                      names_to = "denominator",
                                      values_to = "rate")
 
   # panel order: one outcome per row, population denominator on the left
   panel_order <- expand_grid(outcome = c("Buprenorphine", "Overdose death", "ED visits", "Hospitalizations"),
-                             denominator = c("per 100,000 population 12+", "per 100,000 PWUO-HR")) %>%
+                             denominator = c("per 100,000 population 12+", "per 100,000 PWUO")) %>%
                    mutate(panel = paste0(LETTERS[1:8], ") ", outcome, " ", denominator))
 
   denominator_plot <- denominator_data %>%
@@ -938,7 +938,7 @@ ggsave(filename = "N.png",
 
 # CREATE PREVALENCE VS COVERAGE SCATTER #
 
-  # posterior mean prevalence against buprenorphine rate among PWUO-HR, by year;
+  # posterior mean prevalence against buprenorphine rate among PWUO, by year;
   # the seven counties with the highest quartile-threshold gap probabilities are highlighted
   scatter_data <- N_results %>%
                     transmute(county, year, prev_pct = 100*mean_prev) %>%
@@ -962,8 +962,8 @@ ggsave(filename = "N.png",
                                     aes(x = 5.2, y = lab_y, label = str_to_title(county)),
                                     hjust = 0, size = 2.3) +
                           facet_wrap(~year, ncol = 4) +
-                          labs(x = "Estimated prevalence of PWUO-HR (%)",
-                               y = "Estimated buprenorphine receipt rate among PWUO-HR (%)") +
+                          labs(x = "Estimated prevalence of PWUO (%)",
+                               y = "Estimated buprenorphine receipt rate among PWUO (%)") +
                           theme_bw(base_size = 12) +
                           theme(panel.grid = element_blank(),
                                 strip.background = element_blank(),
@@ -993,13 +993,13 @@ ggsave(filename = "N.png",
     summarise(median_pmp_pct = median(pmp_pct)) %>%
     print()
 
-# COMPUTE ESTIMATED NUMBER OF PWUO-HR NOT RECEIVING BUPRENORPHINE #
+# COMPUTE ESTIMATED NUMBER OF PWUO NOT RECEIVING BUPRENORPHINE #
 
   # posterior of N minus the observed count of persons receiving buprenorphine;
   # the binomial likelihood guarantees N >= the observed count in every draw
   untreated_draws <- sweep(samples[, paste0("N[", 1:273, "]")], 2, yfit$pmp, "-")
 
-  # same quantity as a proportion of the PWUO-HR population, per draw
+  # same quantity as a proportion of the PWUO population, per draw
   untreated_prop_draws <- untreated_draws/samples[, paste0("N[", 1:273, "]")]
 
   untreated_csv <- tibble(county = yfit$county,
