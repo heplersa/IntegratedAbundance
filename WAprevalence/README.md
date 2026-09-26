@@ -1,6 +1,6 @@
 # WAprevalence
 
-Analysis code and data for "Estimating Higher-Risk Opioid Use with a Bayesian Spatiotemporal Model to Inform MOUD Planning in Washington State": a Bayesian spatiotemporal integrated abundance model estimating the annual number and prevalence of people who use opioids in ways that increase health risks (PWUO-HR) in Washington State's 39 counties, 2017-2023.
+Analysis code and data for "Estimating the Prevalence of People with High Risk Opioid Use in Counties in Washington State": a Bayesian spatiotemporal integrated abundance model estimating the annual number and prevalence of people who use opioids in ways that increase health risks (PWUO) in Washington State's 39 counties, 2017-2023.
 
 ## Code
 
