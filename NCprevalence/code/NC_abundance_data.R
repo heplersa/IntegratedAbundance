@@ -573,4 +573,4 @@ save(adj, num,
      logit_W1.obs, logit_W5.obs, logit_W1.state,
      logit_W1.se, logit_W5.se, logit_W1.state.se,
      ony_ind, ony_ind_state, logit_W_init,
-     file = "./data/data_for_analysis.Rda")
+     file = "NCprevalence/data/data_for_analysis.Rda")
